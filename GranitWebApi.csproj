@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="Controllers\HR\**" />
+		<Compile Remove="Services\Background\**" />
+		<Compile Remove="Services\XML\**" />
+		<Content Remove="Controllers\HR\**" />
+		<Content Remove="Services\Background\**" />
+		<Content Remove="Services\XML\**" />
+		<EmbeddedResource Remove="Controllers\HR\**" />
+		<EmbeddedResource Remove="Services\Background\**" />
+		<EmbeddedResource Remove="Services\XML\**" />
+		<None Remove="Controllers\HR\**" />
+		<None Remove="Services\Background\**" />
+		<None Remove="Services\XML\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="Controllers\TESTLER\TeknisyenKontrol.cs" />
+		<Compile Remove="Controllers\Workflow\WorkflowController.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="ClosedXML" Version="0.105.1" />
+		<PackageReference Include="Dapper" Version="2.1.72" />
+		<PackageReference Include="MailKit" Version="4.17.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.26" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.26" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.26">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+		<PackageReference Include="QuestPDF" Version="2026.2.4" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Controllers\Workflow\" />
+		<Folder Include="Workflow\DTO\" />
+		<Folder Include="Workflow\Engine\" />
+		<Folder Include="Workflow\Helpers\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="Services\Email\Templates\**\*.html">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
+
+</Project>
