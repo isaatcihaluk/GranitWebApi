@@ -350,8 +350,10 @@ namespace GranitWebApi.Controllers.BakımOnarım
             try
             {
                 // Son RN
-                var lastRn = await _db.TechnicianLogs.MaxAsync(x => (int?)x.RN) ?? 0;
                 var firstTechnicianId = dto.TechnicianIds.FirstOrDefault();
+
+                const int manualRnStart = 900000000;
+                var lastRn = await _db.TechnicianLogs.Where(x => x.RN >= manualRnStart).MaxAsync(x => (int?)x.RN) ?? manualRnStart;
                 var newRn = lastRn + 1;
 
                 var entity = new TechnicianModel
