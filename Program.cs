@@ -6,6 +6,10 @@ using GranitWebApi.Services.BackgroundServices;
 using GranitWebApi.Services.Email;
 using GranitWebApi.Services.Notifications;
 using GranitWebApi.Services.Reports.Uretim;
+using GranitWebApi.Services.Sales;
+using GranitWebApi.Services.Sales.Definitions;
+
+
 
 //using GranitWebApi.Services.Background;
 using GranitWebApi.Services.Trendyol;
@@ -157,6 +161,16 @@ builder.Services.AddScoped<IUretimDashboardService,UretimDashboardService>();
 
 // UI
 builder.Services.AddScoped<IUiMenuService, UiMenuService>();
+
+// Sales Order Servisler
+builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
+builder.Services.AddScoped<ISalesOrderLineService, SalesOrderLineService>();
+builder.Services.AddScoped<ISalesOrderLineCKConfigurationService,SalesOrderLineCKConfigurationService>();
+builder.Services.AddScoped<ISalesOrderLineImageService,SalesOrderLineImageService>();
+builder.Services.AddScoped<ISalesOrderLineTechnicalItemService,SalesOrderLineTechnicalItemService>();
+builder.Services.AddScoped<ISalesOrderAssemblyCodeRequestService,SalesOrderAssemblyCodeRequestService>();
+builder.Services.AddScoped<ISalesDefinitionService, SalesDefinitionService>();
+builder.Services.AddScoped<ISalesOrderPackageService, SalesOrderPackageService>();
 
 var app = builder.Build();
 

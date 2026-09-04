@@ -264,6 +264,64 @@ namespace GranitWebApi.Controllers.Users
             }
         }
 
+        [HttpGet("usersbyid/{id}")]
+        public IActionResult GetUsersById(int id)
+        {
+            string connStr = _configuration.GetConnectionString("DefaultConnection");
+
+            List<object> users = new List<object>();
+
+            using SqlConnection conn = new SqlConnection(connStr);
+            conn.Open();
+
+            string query = @"
+                SELECT 
+                    Id,
+                    Sicil,
+                    FirstName,
+                    LastName,
+                    Email,
+                    GSM,
+                    Username,
+                    StartDate,
+                    EndDate,
+                    RoleId,
+                    DepartmentId,
+                    ManagerId
+                FROM Users
+                WHERE IsDeleted = 0
+                AND Id = @Id
+                ORDER BY FirstName, LastName";
+
+            using SqlCommand cmd = new SqlCommand(query, conn);
+
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            using SqlDataReader reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                users.Add(new
+                {
+                    id = reader["Id"],
+                    sicil = reader["Sicil"],
+                    firstName = reader["FirstName"],
+                    lastName = reader["LastName"],
+                    fullName = $"{reader["FirstName"]} {reader["LastName"]}",
+                    email = reader["Email"],
+                    gsm = reader["GSM"],
+                    username = reader["Username"],
+                    startdate = reader["StartDate"],
+                    enddate = reader["EndDate"],
+                    roleID = reader["RoleId"],
+                    departmentID = reader["DepartmentId"],
+                    managerID = reader["ManagerId"],
+                });
+            }
+
+            return Ok(users);
+        }
+
         [HttpGet("usersbydepartmentid/{departmentId}")]
         public IActionResult GetUsersByDepartmentId(int departmentId)
         {
@@ -321,6 +379,7 @@ namespace GranitWebApi.Controllers.Users
 
             return Ok(users);
         }
+
         [HttpGet("usersbyroleid/{roleId}")]
         public IActionResult GetUsersByRoleId(int roleId)
         {

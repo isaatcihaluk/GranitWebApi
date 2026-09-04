@@ -30,13 +30,17 @@ namespace GranitWebApi.Workflow.Controllers
                 var data = await _context.ProcessRequest
                     .AsNoTracking()
                     .Where(x =>
-                        (x.CreatedBy == userId &&
-                         (x.Status == WorkflowStatus.Taslak.ToString()
-                          || x.Status == WorkflowStatus.Revize.ToString()))
-                        ||
-                        x.Approvals.Any(a =>
-                            a.ApproverId == userId &&
-                            a.IsActive))
+    x.ProcessType.Code != "SATIS_SIPARIS"
+    &&
+    (
+        (x.CreatedBy == userId &&
+         (x.Status == WorkflowStatus.Taslak.ToString()
+          || x.Status == WorkflowStatus.Revize.ToString()))
+        ||
+        x.Approvals.Any(a =>
+            a.ApproverId == userId &&
+            a.IsActive)
+    ))
                     .OrderByDescending(x => x.CreatedDate)
                     .Select(x => new
                     {

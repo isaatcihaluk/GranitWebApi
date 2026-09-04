@@ -15,25 +15,31 @@ namespace GranitWebApi.Workflow.Resolvers
             _context = context;
         }
 
-
         public ApprovalType ApprovalType => ApprovalType.Role;
 
-
-        public async Task<List<int>> ResolveAsync(
-            WorkflowStep step,
-            ProcessRequest request)
+        public async Task<List<int>> ResolveAsync(WorkflowStep step,ProcessRequest request)
         {
-            if (step.RoleId == null)
-                return new List<int>();
+            if (step.RoleId == null) return new List<int>();
 
-
-            var users = await _context.Users
+            // Users.RoleId üzerinden gelen kullanıcılar
+            var usersByUserRoleField = await _context.Users
                 .Where(x =>
                     x.RoleId == step.RoleId &&
                     x.IsDeleted == false)
                 .Select(x => x.Id)
                 .ToListAsync();
 
+            // UserRoles tablosu üzerinden gelen kullanıcılar
+            var usersByUserRoles = await _context.UserRoles
+                .Where(x => x.RoleId == step.RoleId)
+                .Select(x => x.UserId)
+                .ToListAsync();
+
+            // İki kaynağı birleştir, tekrar eden kullanıcıları kaldır
+            var users = usersByUserRoleField
+                .Union(usersByUserRoles)
+                .Distinct()
+                .ToList();
 
             return users;
         }
