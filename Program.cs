@@ -4,7 +4,9 @@ using GranitWebApi.Helpers;
 using GranitWebApi.Services;
 using GranitWebApi.Services.BackgroundServices;
 using GranitWebApi.Services.Email;
+using GranitWebApi.Services.Email.Sales;
 using GranitWebApi.Services.Notifications;
+using GranitWebApi.Services.Proforma;
 using GranitWebApi.Services.Reports.Uretim;
 using GranitWebApi.Services.Sales;
 using GranitWebApi.Services.Sales.Definitions;
@@ -120,6 +122,7 @@ builder.Services.AddScoped<IApprovalResolver, RoleResolver>();
 builder.Services.AddScoped<IApprovalResolver, UserResolver>();
 builder.Services.AddScoped<IApprovalResolver, SqlResolver>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
+builder.Services.AddScoped<WorkflowService>();
 
 // Mail Settings, Email ve Bildirim Service ekle
 builder.Services.Configure<EmailSettings>(
@@ -163,6 +166,7 @@ builder.Services.AddScoped<IUretimDashboardService,UretimDashboardService>();
 builder.Services.AddScoped<IUiMenuService, UiMenuService>();
 
 // Sales Order Servisler
+builder.Services.Configure<FileStorageSettings>(builder.Configuration.GetSection("FileStorage"));
 builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<ISalesOrderLineService, SalesOrderLineService>();
 builder.Services.AddScoped<ISalesOrderLineCKConfigurationService,SalesOrderLineCKConfigurationService>();
@@ -171,6 +175,16 @@ builder.Services.AddScoped<ISalesOrderLineTechnicalItemService,SalesOrderLineTec
 builder.Services.AddScoped<ISalesOrderAssemblyCodeRequestService,SalesOrderAssemblyCodeRequestService>();
 builder.Services.AddScoped<ISalesDefinitionService, SalesDefinitionService>();
 builder.Services.AddScoped<ISalesOrderPackageService, SalesOrderPackageService>();
+builder.Services.AddScoped<ISalesOrderFormService, SalesOrderFormService>();
+builder.Services.AddScoped<SalesOrderExcelService>();
+builder.Services.AddScoped<ISalesOrderMailService, SalesOrderMailService>();
+builder.Services.AddScoped<ISalesOrderLineUMConfigurationService,SalesOrderLineUMConfigurationService>();
+
+//PROFORMA
+builder.Services.AddScoped<ISalesProformaService,SalesProformaService>();
+builder.Services.AddScoped<IWorkflowProcessHandler,SalesProformaWorkflowHandler>();
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
 

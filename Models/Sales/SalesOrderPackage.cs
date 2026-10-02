@@ -49,6 +49,21 @@ namespace GranitWebApi.Models.Sales
         [MaxLength(250)]
         public string? NetsisPaketAdi { get; set; }
 
+        [Column(TypeName = "decimal(18,3)")]
+        public decimal? PackageQuantity { get; set; }
+
+        [Column(TypeName = "decimal(18,3)")]
+        public decimal? KoliAdedi { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? UnitKoliPrice { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? TotalPrice { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? UnitPrice { get; set; }
+
         [Required]
         [MaxLength(30)]
         public string Status { get; set; } = "TASLAK";
@@ -66,6 +81,7 @@ namespace GranitWebApi.Models.Sales
 
         [MaxLength(100)]
         public string? Referans { get; set; }
+        public string? Definition { get; set; }
     }
     public class SalesOrderPackageCreateRequest
     {
@@ -78,5 +94,35 @@ namespace GranitWebApi.Models.Sales
     {
         public long SalesOrderLineId { get; set; }
         public decimal Quantity { get; set; }
+    }
+    public class SalesOrderPricingRequest
+    {
+        public long SalesOrderId { get; set; }
+
+        public string? Definition { get; set; }
+
+        public List<SalesOrderPackagePricingRequest> Packages { get; set; } = new();
+    }
+
+    public class SalesOrderPackagePricingRequest
+    {
+        public long PackageId { get; set; }
+
+        public decimal UnitPrice { get; set; }
+
+        public string? Definition { get; set; }
+    }
+
+    public class SalesOrderRevisionPricingRequest
+    {
+        public long SalesOrderId { get; set; }
+        public List<SalesOrderPackageRevisionPricingRequest> Packages { get; set; } = new();
+    }
+
+    public class SalesOrderPackageRevisionPricingRequest
+    {
+        public long PackageId { get; set; }
+        public decimal KoliAdedi { get; set; }
+        public decimal UnitPrice { get; set; }
     }
 }

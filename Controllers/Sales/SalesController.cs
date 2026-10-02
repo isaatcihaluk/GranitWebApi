@@ -14,12 +14,14 @@ namespace GranitWebApi.Controllers.Sales
     public class SalesController : ControllerBase
     {
         private readonly ISalesOrderService _salesOrderService;
+        private readonly ISalesOrderFormService _salesOrderFormService;
         private readonly UserContext _userContext;
         private readonly AppDbContext _context;
 
-        public SalesController(ISalesOrderService salesOrderService,UserContext userContext, AppDbContext context)
+        public SalesController(ISalesOrderService salesOrderService, ISalesOrderFormService salesOrderFormService,UserContext userContext, AppDbContext context)
         {
             _salesOrderService = salesOrderService;
+            _salesOrderFormService = salesOrderFormService;
             _userContext = userContext;
             _context = context;
         }
@@ -89,7 +91,6 @@ namespace GranitWebApi.Controllers.Sales
             try
             {
                 var lines = await _salesOrderService.GetLinesAsync(salesOrderId);
-
                 return Ok(lines);
             }
             catch (Exception ex)
@@ -120,11 +121,7 @@ namespace GranitWebApi.Controllers.Sales
         {
             try
             {
-                var processRequestId =
-                    await _salesOrderService.SendForApprovalAsync(
-                        id,
-                        _userContext.UserId);
-
+                var processRequestId = await _salesOrderService.SendForApprovalAsync(id,_userContext.UserId);
                 return Ok(new
                 {
                     message = "Satış siparişi teknik onaya gönderildi.",
@@ -152,6 +149,157 @@ namespace GranitWebApi.Controllers.Sales
                 return Ok(new
                 {
                     message = "Teknik aşama tamamlandı. Sipariş paketleme aşamasına geçti."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("{salesOrderId}/order-form")]
+        public async Task<IActionResult> GetOrderForm(long salesOrderId)
+        {
+            try
+            {
+                var result = await _salesOrderFormService.GetOrderFormDataAsync(salesOrderId);
+                if (result == null) return NotFound("Sipariş bulunamadı.");
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{salesOrderId}/order-form/pdf")]
+        public async Task<IActionResult> GenerateOrderFormPdf(long salesOrderId)
+        {
+            try
+            {
+                var pdf = await _salesOrderFormService
+                    .GenerateOrderFormPdfAsync(salesOrderId);
+
+                return File(
+                    pdf,
+                    "application/pdf",
+                    $"SiparisFormu-{salesOrderId}.pdf"
+                );
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{id}/excel")]
+        public async Task<IActionResult> GetOrderExcel(long id,[FromServices] SalesOrderExcelService excelService)
+        {
+            try
+            {
+                var file = await excelService.CreateSalesOrderExcelAsync(id);
+
+                return File(
+                    file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    $"SiparisFormu_{id}.xlsx");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = ex.Message,
+                    innerException = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        //SHRINK REÇETE OLUŞTURMA
+        [HttpPost("{id:long}/prepare-shrink-recipes")]
+        public async Task<IActionResult> PrepareShrinkRecipes(long id)
+        {
+            try
+            {
+                var result = await _salesOrderService.PrepareShrinkRecipesAsync(id);
+                if (!result.Basarili) {return BadRequest(result);}
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    basarili = false,
+                    hata = true,
+                    message = ex.Message
+                });
+            }
+        }
+
+        //PAKET REÇETE OLUŞTURMA
+        [HttpPost("{id:long}/prepare-package-recipes")]
+        public async Task<IActionResult> PreparePackageRecipes(long id)
+        {
+            try
+            {
+                var result = await _salesOrderService.PreparePackageRecipesAsync(id);
+                if (!result.Basarili) { return BadRequest(result); }
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    basarili = false,
+                    hata = true,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("{id:long}/transfer-netsis")]
+        public async Task<IActionResult> TransferToNetsis(long id)
+        {
+            try
+            {
+                var result = await _salesOrderService.TransferToNetsisAsync(id);
+
+                if (!result.Basarili)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    basarili = false,
+                    hata = true,
+                    salesOrderId = id,
+                    message = ex.Message
+                });
+            }
+        }
+
+        // YENİ: NETSIS AKTARILMIŞ SİPARİŞ ÜST BİLGİ REVİZYONU
+        [HttpPut("{id:long}/revision-header")]
+        public async Task<IActionResult> UpdateRevisionHeader(long id,[FromBody] SalesOrder salesOrder)
+        {
+            try
+            {
+                var result = await _salesOrderService.UpdateRevisionHeaderAsync(id,salesOrder,_userContext.UserId);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
                 });
             }
             catch (Exception ex)

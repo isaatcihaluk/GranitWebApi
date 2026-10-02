@@ -47,6 +47,7 @@
 
 	<ItemGroup>
 		<Folder Include="Controllers\Workflow\" />
+		<Folder Include="logs\" />
 		<Folder Include="Workflow\DTO\" />
 		<Folder Include="Workflow\Engine\" />
 		<Folder Include="Workflow\Helpers\" />

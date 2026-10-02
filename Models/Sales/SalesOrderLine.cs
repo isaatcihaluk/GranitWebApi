@@ -29,10 +29,12 @@ namespace GranitWebApi.Models.Sales
         public bool DeletedFlag { get; set; }
         public string? ShrinkliKod { get; set; }
         public string? ShrinkliAd { get; set; }
+        public string? YKFabricCode { get; set; }
         [JsonIgnore]
         [ForeignKey(nameof(SalesOrderId))]
         public GranitWebApi.Models.Sales.SalesOrder? SalesOrder { get; set; }
         public SalesOrderLineCKConfiguration? CKConfiguration { get; set; }
+        public SalesOrderLineUMConfiguration? UMConfiguration { get; set; }
         public ICollection<SalesOrderLineImage>? Images { get; set; }
         public ICollection<SalesOrderLineTechnicalItem>? TechnicalItems { get; set; }
         [JsonIgnore]
@@ -63,8 +65,26 @@ namespace GranitWebApi.Models.Sales
         public int? KoliId { get; set; }
         public string? KoliKod { get; set; }
         public int? KoliIciMiktar { get; set; }
+        public string? BodyType { get; set; }
+        public string? BodyCode { get; set; }
+        public string? IroningBoardCode { get; set; }
+        public string? FootCode { get; set; }
+        public string? BodyIroningRal { get; set; }
+        public string? BodyIroningColor { get; set; }
+        public string? FootColor { get; set; }
+        public string? FabricCode { get; set; }
+        public string? FabricName { get; set; }
+        public string? SpongeCode { get; set; }
+        public string? SpongeName { get; set; }
+        public decimal? SpongeQuantity { get; set; }
+        public bool HasFis { get; set; }
+        public string? FisType { get; set; }
+        public string? FisCode { get; set; }
+        public string? FisName { get; set; }
+        public string? PlasticCombinationNo { get; set; }
+        public string? PlasticCombinationDescription { get; set; }
+        public string? YKFabricCode { get; set; }
     }
-
     public class SalesOrderLineEditImage
     {
         public long Id { get; set; }

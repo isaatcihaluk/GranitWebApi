@@ -1,12 +1,13 @@
 ﻿using GranitWebApi.Models.Sales;
 
-namespace GranitWebApi.Services.Sales
+public interface ISalesOrderPackageService
 {
-    public interface ISalesOrderPackageService
-    {
-        Task<SalesOrder?> GetPackagingDataAsync(long salesOrderId);
-        Task<SalesOrderPackage> CreatePackageAsync(SalesOrderPackageCreateRequest request,int userId);
-        Task<SalesOrderPackage> UpdatePackageAsync(long packageId,SalesOrderPackageCreateRequest request,int userId);
-        Task CancelPackageAsync(long packageId,long salesOrderId,int userId);
-    }
+    Task<SalesOrder?> GetPackagingDataAsync(long salesOrderId);
+    Task<SalesOrderPackage> CreatePackageAsync(SalesOrderPackageCreateRequest request);
+    Task<SalesOrderPackage> UpdatePackageAsync(long packageId,SalesOrderPackageCreateRequest request);
+    Task CancelPackageAsync(long packageId,long salesOrderId);
+    Task CompletePackagingAsync(long salesOrderId);
+    Task<SalesOrder?> GetPricingDataAsync(long salesOrderId);
+    Task SavePricingAsync(SalesOrderPricingRequest request);
+    Task UpdateRevisionPricingAsync(SalesOrderRevisionPricingRequest request);
 }

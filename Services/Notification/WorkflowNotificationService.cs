@@ -234,5 +234,45 @@ namespace GranitWebApi.Services.Notifications
 
             await _notificationService.SendAsync(notification);
         }
+        public async Task SendPrepaymentRequiredAsync(int requestId)
+        {
+            var request = await _context.ProcessRequest
+                .FirstOrDefaultAsync(x => x.Id == requestId);
+
+            if (request == null)
+                return;
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x => x.Id == request.CreatedBy);
+
+            if (user == null || string.IsNullOrWhiteSpace(user.Email))
+                return;
+
+            var processName = await _context.WorkflowDefinition
+                .Where(x =>
+                    x.ProcessTypeId == request.ProcessTypeId &&
+                    x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+            var notification = new NotificationModel
+            {
+                To = user.Email,
+
+                Subject = $"{processName ?? "Proforma"} - Ön Ödeme Bilgisi Bekleniyor",
+
+                Template = "WorkflowApproved",
+
+                Values = new Dictionary<string, string>
+                {
+                    ["TalepNo"] = request.Id.ToString(),
+                    ["SurecAdi"] = processName ?? "-",
+                    ["Durum"] = "ON_ODEME_BEKLIYOR",
+                    ["Tarih"] = DateTime.Now.ToString("dd.MM.yyyy HH:mm")
+                }
+            };
+
+            await _notificationService.SendAsync(notification);
+        }
     }
 }

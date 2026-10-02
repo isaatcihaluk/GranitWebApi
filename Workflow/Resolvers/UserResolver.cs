@@ -10,17 +10,20 @@ namespace GranitWebApi.Workflow.Resolvers
         private readonly AppDbContext _context;
 
         public ApprovalType ApprovalType => ApprovalType.User;
-
         public UserResolver(AppDbContext context)
         {
             _context = context;
         }
 
-        public Task<List<int>> ResolveAsync(
-            WorkflowStep step,
-            ProcessRequest request)
+        public Task<List<int>> ResolveAsync(WorkflowStep step,ProcessRequest request)
         {
-            throw new NotImplementedException();
+            if (step.UserId == null) return Task.FromResult(new List<int>());
+
+            return Task.FromResult(
+                new List<int>
+                {
+                    step.UserId.Value
+                });
         }
     }
 }

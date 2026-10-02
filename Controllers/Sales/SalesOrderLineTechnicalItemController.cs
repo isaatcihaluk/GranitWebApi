@@ -127,16 +127,13 @@ namespace GranitWebApi.Controllers.Sales
             return Ok(result);
         }
 
-        [HttpPost("save")]
-        public async Task<IActionResult> Save([FromBody] List<SalesOrderLineTechnicalItem> technicalItems)
+        [HttpPost("save/{salesOrderLineId}")]
+        public async Task<IActionResult> Save(long salesOrderLineId,[FromBody] List<SalesOrderLineTechnicalItem> technicalItems)
         {
             try
             {
-                if (technicalItems == null || technicalItems.Count == 0)
-                {
-                    return BadRequest(new {message = "Kaydedilecek teknik stok seçimi bulunamadı."});
-                }
-                var salesOrderLineId =technicalItems.First().SalesOrderLineId;
+                if (salesOrderLineId <= 0){return BadRequest(new {message = "Geçersiz sipariş satırı."});}
+                technicalItems ??= new List<SalesOrderLineTechnicalItem>();
 
                 await _technicalItemService.SaveTechnicalItemsAsync(salesOrderLineId,technicalItems);
                 return Ok(new {message = "Teknik stok seçimleri başarıyla kaydedildi."});

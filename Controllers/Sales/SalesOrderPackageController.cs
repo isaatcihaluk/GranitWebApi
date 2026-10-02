@@ -2,7 +2,6 @@
 using GranitWebApi.Services.Sales;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace GranitWebApi.Controllers.Sales
 {
@@ -12,25 +11,16 @@ namespace GranitWebApi.Controllers.Sales
     public class SalesOrderPackageController : ControllerBase
     {
         private readonly ISalesOrderPackageService _packageService;
-
-        public SalesOrderPackageController(
-            ISalesOrderPackageService packageService)
+        public SalesOrderPackageController(ISalesOrderPackageService packageService)
         {
             _packageService = packageService;
         }
 
-
-        // ---------------------------------------------------------
         // PAKETLEME VERİLERİ
-        // ---------------------------------------------------------
-
         [HttpGet("orders/{salesOrderId}/packaging")]
-        public async Task<IActionResult> GetPackagingData(
-            long salesOrderId)
+        public async Task<IActionResult> GetPackagingData(long salesOrderId)
         {
-            var order = await _packageService
-                .GetPackagingDataAsync(salesOrderId);
-
+            var order = await _packageService.GetPackagingDataAsync(salesOrderId);
             if (order == null)
             {
                 return NotFound(new
@@ -38,19 +28,12 @@ namespace GranitWebApi.Controllers.Sales
                     message = "Sipariş bulunamadı."
                 });
             }
-
             return Ok(order);
         }
 
-
-        // ---------------------------------------------------------
         // PAKET OLUŞTUR
-        // ---------------------------------------------------------
-
         [HttpPost("orders/{salesOrderId}/packaging")]
-        public async Task<IActionResult> CreatePackage(
-            long salesOrderId,
-            [FromBody] SalesOrderPackageCreateRequest request)
+        public async Task<IActionResult> CreatePackage(long salesOrderId,[FromBody] SalesOrderPackageCreateRequest request)
         {
             try
             {
@@ -58,41 +41,11 @@ namespace GranitWebApi.Controllers.Sales
                 {
                     return BadRequest(new
                     {
-                        message =
-                            "Sipariş numarası ile gönderilen sipariş bilgisi uyuşmuyor."
+                        message ="Sipariş numarası ile gönderilen sipariş bilgisi uyuşmuyor."
                     });
                 }
 
-
-                var userIdClaim = User.FindFirst(
-                    ClaimTypes.NameIdentifier);
-
-                if (userIdClaim == null)
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Kullanıcı bilgisi alınamadı."
-                    });
-                }
-
-
-                if (!int.TryParse(
-                        userIdClaim.Value,
-                        out var userId))
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Geçersiz kullanıcı bilgisi."
-                    });
-                }
-
-
-                var package =
-                    await _packageService.CreatePackageAsync(
-                        request,
-                        userId);
-
-
+                var package =await _packageService.CreatePackageAsync(request);
                 return Ok(new
                 {
                     package.Id,
@@ -117,6 +70,13 @@ namespace GranitWebApi.Controllers.Sales
                     }).ToList()
                 });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new
+                {
+                    message = ex.Message
+                });
+            }
             catch (Exception ex)
             {
                 return BadRequest(new
@@ -126,15 +86,9 @@ namespace GranitWebApi.Controllers.Sales
             }
         }
 
-
-        // ---------------------------------------------------------
         // PAKET GÜNCELLE
-        // ---------------------------------------------------------
-
         [HttpPut("orders/{salesOrderId}/packaging/{packageId}")]
-        public async Task<IActionResult> UpdatePackage(
-            long salesOrderId,
-            long packageId,
+        public async Task<IActionResult> UpdatePackage(long salesOrderId,long packageId,
             [FromBody] SalesOrderPackageCreateRequest request)
         {
             try
@@ -143,42 +97,10 @@ namespace GranitWebApi.Controllers.Sales
                 {
                     return BadRequest(new
                     {
-                        message =
-                            "Sipariş numarası ile gönderilen sipariş bilgisi uyuşmuyor."
+                        message ="Sipariş numarası ile gönderilen sipariş bilgisi uyuşmuyor."
                     });
                 }
-
-
-                var userIdClaim = User.FindFirst(
-                    ClaimTypes.NameIdentifier);
-
-                if (userIdClaim == null)
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Kullanıcı bilgisi alınamadı."
-                    });
-                }
-
-
-                if (!int.TryParse(
-                        userIdClaim.Value,
-                        out var userId))
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Geçersiz kullanıcı bilgisi."
-                    });
-                }
-
-
-                var package =
-                    await _packageService.UpdatePackageAsync(
-                        packageId,
-                        request,
-                        userId);
-
-
+                var package =await _packageService.UpdatePackageAsync(packageId,request);
                 return Ok(new
                 {
                     package.Id,
@@ -203,6 +125,13 @@ namespace GranitWebApi.Controllers.Sales
                     }).ToList()
                 });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new
+                {
+                    message = ex.Message
+                });
+            }
             catch (Exception ex)
             {
                 return BadRequest(new
@@ -212,50 +141,107 @@ namespace GranitWebApi.Controllers.Sales
             }
         }
 
-
-        // ---------------------------------------------------------
         // PAKET İPTAL
-        // ---------------------------------------------------------
-
         [HttpDelete("orders/{salesOrderId}/packaging/{packageId}")]
-        public async Task<IActionResult> CancelPackage(
-            long salesOrderId,
-            long packageId)
+        public async Task<IActionResult> CancelPackage(long salesOrderId,long packageId)
         {
             try
             {
-                var userIdClaim = User.FindFirst(
-                    ClaimTypes.NameIdentifier);
-
-                if (userIdClaim == null)
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Kullanıcı bilgisi alınamadı."
-                    });
-                }
-
-
-                if (!int.TryParse(
-                        userIdClaim.Value,
-                        out var userId))
-                {
-                    return Unauthorized(new
-                    {
-                        message = "Geçersiz kullanıcı bilgisi."
-                    });
-                }
-
-
-                await _packageService.CancelPackageAsync(
-                    packageId,
-                    salesOrderId,
-                    userId);
-
-
+                await _packageService.CancelPackageAsync(packageId,salesOrderId);
                 return Ok(new
                 {
                     message = "Paket başarıyla iptal edildi."
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+        // PAKETLEMEYİ TAMAMLA
+        [HttpPost("orders/{salesOrderId}/packaging/complete")]
+        public async Task<IActionResult> CompletePackaging(long salesOrderId)
+        {
+            try
+            {
+                await _packageService.CompletePackagingAsync(salesOrderId);
+                return Ok(new { message = "Paketleme başarıyla tamamlandı." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // FİYATLANDIRMA VERİLERİ
+        [HttpGet("{salesOrderId}/pricing")]
+        public async Task<IActionResult> GetPricingData(long salesOrderId)
+        {
+            try
+            {
+                var result = await _packageService.GetPricingDataAsync(salesOrderId);
+                if (result == null)
+                {
+                    return NotFound(new { message = "Sipariş bulunamadı." });
+                }
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("orders/pricing")]
+        public async Task<IActionResult> SavePricing([FromBody] SalesOrderPricingRequest request)
+        {
+            try
+            {
+                await _packageService.SavePricingAsync(request);
+                return Ok(new { message = "Fiyatlandırma başarıyla kaydedildi." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("orders/{id:long}/revision-pricing")]
+        public async Task<IActionResult> UpdateRevisionPricing(long id,[FromBody] SalesOrderRevisionPricingRequest request)
+        {
+            try
+            {
+                request.SalesOrderId = id;
+                await _packageService.UpdateRevisionPricingAsync(request);
+                return Ok(new
+                {
+                    message = "Fiyat / miktar revizyonu başarıyla kaydedildi."
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new
+                {
+                    message = ex.Message
                 });
             }
             catch (Exception ex)

@@ -3,19 +3,19 @@
     public enum WorkflowStatus
     {
         Taslak = 0,
-
         Onayda = 1,
+        Reddedildi = 2,
+        Revize = 3,
+        Iptal = 4,
+        Tamamlandi = 5
+    }
 
-        Onaylandi = 2,
-
-        Reddedildi = 3,
-
-        IadeEdildi = 4,
-
-        Iptal = 5,
-
-        Tamamlandi = 6,
-
-        Revize = 7
+    public enum WorkflowApprovalStatus
+    {
+        Onayda = 0,
+        Onaylandi = 1,
+        Reddedildi = 2,
+        Revize = 3,
+        Iptal = 4
     }
 }

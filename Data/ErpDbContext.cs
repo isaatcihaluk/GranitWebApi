@@ -7,4 +7,5 @@ public class ErpDbContext : DbContext
     {
     }
     public DbSet<TBLSTSABIT> TBLSTSABIT { get; set; }
+    public DbSet<TBLSTOKURM> TBLSTOKURM { get; set; }
 }

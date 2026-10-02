@@ -9,9 +9,7 @@ namespace GranitWebApi.Services.Sales
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
 
-        public SalesOrderLineImageService(
-            AppDbContext context,
-            IConfiguration configuration)
+        public SalesOrderLineImageService(AppDbContext context,IConfiguration configuration)
         {
             _context = context;
             _configuration = configuration;

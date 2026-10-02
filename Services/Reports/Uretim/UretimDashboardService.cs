@@ -208,17 +208,17 @@ namespace GranitWebApi.Services.Reports.Uretim
             var list = await query.ToListAsync(cancellationToken);
 
             var linqQuery = query
-    .Where(x => x.StopName != null)
-    .GroupBy(x => new
-    {
-        StopName = x.StopName
-    })
-    .Select(g => new DowntimeReasonResult
-    {
-        StopName = g.Key.StopName,
-        TotalMinutes = g.Sum(x => x.StopMinute ?? 0),
-        StopCount = g.Count()
-    });
+                .Where(x => x.StopName != null)
+                .GroupBy(x => new
+                {
+                    StopName = x.StopName
+                })
+                .Select(g => new DowntimeReasonResult
+                {
+                    StopName = g.Key.StopName,
+                    TotalMinutes = g.Sum(x => x.StopMinute ?? 0),
+                    StopCount = g.Count()
+                });
 
             Console.WriteLine(linqQuery.ToQueryString());
 

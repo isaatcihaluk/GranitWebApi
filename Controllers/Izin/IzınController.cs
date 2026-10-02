@@ -336,8 +336,6 @@ namespace GranitWebApi.Controllers.Izin
                                 ? "secondary"
                             : x.Durum == WorkflowStatus.Onayda.ToString()
                                 ? "warning"
-                            : x.Durum == WorkflowStatus.Onaylandi.ToString()
-                                ? "success"
                             : x.Durum == WorkflowStatus.Reddedildi.ToString()
                                 ? "danger"
                             : x.Durum == WorkflowStatus.Revize.ToString()
@@ -664,8 +662,7 @@ namespace GranitWebApi.Controllers.Izin
             if (!processRequestId.HasValue) return false;
 
             return await _context.ProcessApproval.AnyAsync(x =>
-                x.RequestId == processRequestId.Value &&
-                x.Status == WorkflowStatus.Onaylandi.ToString());
+                x.RequestId == processRequestId.Value);
         }
         private async Task<decimal> GetYillikIzinBakiyeBySicil(string sicil)
         {

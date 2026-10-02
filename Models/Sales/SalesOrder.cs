@@ -48,11 +48,8 @@ namespace GranitWebApi.Models.Sales
         [Required]
         [MaxLength(50)]
         public string Status { get; set; } = "DRAFT";
-
         public DateTime CreatedAt { get; set; }
-
         public int CreatedBy { get; set; }
-
         public DateTime? UpdatedAt { get; set; }
         public int? UpdatedBy { get; set; }
         public DateTime? FinalApprovedAt { get; set; }
@@ -61,6 +58,7 @@ namespace GranitWebApi.Models.Sales
         public string? NetsisOrderNumber { get; set; }
         public DateTime? NetsisTransferredAt { get; set; }
         public int? ProcessRequestId { get; set; }
+        public string? Definition { get; set; }
         // Navigation Properties
         public ICollection<SalesOrderLine> Lines { get; set; } = new List<SalesOrderLine>();
         public ICollection<SalesOrderPackage> Packages { get; set; } = new List<SalesOrderPackage>();

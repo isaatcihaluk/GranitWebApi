@@ -1,6 +1,7 @@
 ﻿using GranitWebApi.Models;
 using GranitWebApi.Models.BakimOnarim;
 using GranitWebApi.Models.IK.Izin;
+using GranitWebApi.Models.Proforma;
 using GranitWebApi.Models.Promanage;
 using GranitWebApi.Models.Sabitler.Makine;
 using GranitWebApi.Models.Sabitler.Users;
@@ -105,8 +106,11 @@ namespace GranitWebApi.Data
 
             // Decimal alan
             modelBuilder.Entity<SalesOrderPackageLine>().Property(x => x.Quantity).HasPrecision(18, 3);
-
             modelBuilder.Entity<PaketRenk>().HasKey(x => x.No);
+
+            // PROFORMA
+            modelBuilder.Entity<SalesProforma>().HasMany(x => x.Lines).WithOne(x => x.Proforma)
+                .HasForeignKey(x => x.ProformaId).OnDelete(DeleteBehavior.Restrict);
         }
 
         public DbSet<TechnicianModel> TechnicianLogs { get; set; }
@@ -169,6 +173,7 @@ namespace GranitWebApi.Data
         public DbSet<SalesOrderAssemblyCodeRequest> SalesOrderAssemblyCodeRequests { get; set; }
         public DbSet<SalesOrderPackage> SalesOrderPackages { get; set; }
         public DbSet<SalesOrderPackageLine> SalesOrderPackageLines { get; set; }
+        public DbSet<SalesOrderLineUMConfiguration> SalesOrderLineUMConfigurations { get; set; }
 
         // Sales Definition
         public DbSet<ProductGroup> ProductGroups { get; set; }
@@ -179,5 +184,12 @@ namespace GranitWebApi.Data
         public DbSet<ProductBox> ProductBoxes { get; set; }
         public DbSet<SalesCustomer> SalesCustomers { get; set; }
         public DbSet<PaketRenk> PaketRenkler { get; set; } = null!;
+        public DbSet<ProductShrink> ProductShrinks { get; set; }
+        public DbSet<UmUrunDetayAna> UmUrunDetayAna { get; set; }
+
+        // PROFORMA
+        public DbSet<SalesProforma> SalesProformas { get; set; }
+        public DbSet<SalesProformaLine> SalesProformaLines { get; set; }
+        public DbSet<SalesProformaPayment> SalesProformaPayments { get; set; }
     }
 }

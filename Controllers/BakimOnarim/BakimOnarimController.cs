@@ -471,6 +471,65 @@ namespace GranitWebApi.Controllers.BakımOnarım
 
 
                 // =========================================================
+                // VARDİYA RAPOR TARİHİ
+                //
+                // Vardiyalar:
+                //
+                // 1 -> 07:45 - 17:45
+                // 2 -> 17:45 - 20:15
+                // 3 -> 20:15 - 23:30
+                // 4 -> 23:30 - 07:45
+                //
+                // Vardiya 4 gece yarısını geçtiği için:
+                //
+                // 09.09 23:40 -> 09.09
+                // 09.09 23:54 -> 09.09
+                // 10.09 00:04 -> 09.09
+                // 10.09 01:49 -> 09.09
+                // 10.09 05:11 -> 09.09
+                // 10.09 07:44 -> 09.09
+                //
+                // 10.09 07:45 -> 10.09
+                //
+                // Burada vardiya numarasına güveniyoruz.
+                // Çünkü TechnicianLogs içerisinde Shift bilgisi mevcut.
+                // =========================================================
+
+                DateTime GetShiftReportDate(TechnicianModel log)
+                {
+                    if (!log.CreatedAt.HasValue)
+                        return DateTime.MinValue;
+
+                    var createdAt = log.CreatedAt.Value;
+
+                    var shift =
+                        log.Shift?.ToString()?.Trim();
+
+                    // Vardiya 4
+                    if (shift == "4")
+                    {
+                        var shift4End =
+                            new TimeSpan(7, 45, 0);
+
+                        // 00:00 - 07:44:59
+                        // bir önceki günün vardiya 4'üne aittir.
+                        if (createdAt.TimeOfDay < shift4End)
+                        {
+                            return createdAt.Date.AddDays(-1);
+                        }
+
+                        // 23:30 - 23:59:59
+                        // aynı günün vardiya 4'üne aittir.
+                        return createdAt.Date;
+                    }
+
+                    // Vardiya 1, 2, 3
+                    // kendi takvim gününe aittir.
+                    return createdAt.Date;
+                }
+
+
+                // =========================================================
                 // TEKNİSYEN / PERSONEL LİSTESİ
                 // RoleId = 5 olan kullanıcılar
                 // =========================================================
@@ -587,15 +646,63 @@ namespace GranitWebApi.Controllers.BakımOnarım
 
                 // =========================================================
                 // LOG'LAR
+                //
+                // Vardiya 4'ün gece yarısından sonraki kısmını
+                // yakalayabilmek için bir gün geriye ve bir gün ileriye
+                // taşmadan güvenli bir pencere oluşturuyoruz.
+                //
+                // Örneğin:
+                //
+                // Kullanıcı:
+                // 09.09 - 09.09
+                //
+                // İhtiyaç:
+                // 09.09 23:30 - 10.09 07:45
+                //
+                // Bu nedenle sorguyu:
+                //
+                // 09.09 00:00
+                // -
+                // 11.09 00:00
+                //
+                // aralığında getiriyoruz.
+                //
+                // Sonrasında gerçek rapor tarihine göre filtreliyoruz.
                 // =========================================================
+
+                var logQueryStartDate =
+                    startDate;
+
+                var logQueryEndDate =
+                    endDate.AddDays(1);
+
 
                 var logs = await _db.TechnicianLogs
                     .AsNoTracking()
                     .Where(x =>
                         x.CreatedAt.HasValue &&
-                        x.CreatedAt.Value >= startDate &&
-                        x.CreatedAt.Value < endDate)
+                        x.CreatedAt.Value >= logQueryStartDate &&
+                        x.CreatedAt.Value < logQueryEndDate)
                     .ToListAsync();
+
+
+                // =========================================================
+                // RAPOR TARİHİNE GÖRE FİLTRELEME
+                //
+                // Burada vardiya 4'ün gece yarısından sonraki
+                // kayıtları doğru rapor gününe taşınıyor.
+                // =========================================================
+
+                logs = logs
+                    .Where(x =>
+                    {
+                        var reportDate =
+                            GetShiftReportDate(x);
+
+                        return reportDate >= startDate &&
+                               reportDate < endDate;
+                    })
+                    .ToList();
 
 
                 // =========================================================
@@ -745,12 +852,22 @@ namespace GranitWebApi.Controllers.BakımOnarım
 
                 // =========================================================
                 // GÜNLÜK TREND
+                //
+                // ÖNEMLİ:
+                //
+                // Artık CreatedAt.Date kullanılmıyor.
+                //
+                // Vardiya 4:
+                //
+                // 10.09 00:04
+                //
+                // kaydı 09.09 rapor tarihine gidecek.
                 // =========================================================
 
                 var dailyTrend = logs
                     .Where(x => x.CreatedAt.HasValue)
-                    .GroupBy(x => x.CreatedAt!.Value.Date)
-                    .OrderBy(x => x.Key)
+                    .GroupBy(x => GetShiftReportDate(x))
+                    .OrderBy(g => g.Key)
                     .Select(g =>
                     {
                         var dayLogs = g.ToList();
@@ -964,8 +1081,7 @@ namespace GranitWebApi.Controllers.BakımOnarım
                                     !IsEmptyDate(x.TCall) &&
                                     !IsEmptyDate(x.TLogin))
                                 .Select(x =>
-                                    (x.TLogin!.Value -
-                                     x.TCall!.Value)
+                                    (x.TLogin!.Value - x.TCall!.Value)
                                     .TotalMinutes)
                                 .Where(x => x >= 0)
                                 .ToList();
@@ -976,8 +1092,7 @@ namespace GranitWebApi.Controllers.BakımOnarım
                                     !IsEmptyDate(x.TLogin) &&
                                     !IsEmptyDate(x.TEnd))
                                 .Select(x =>
-                                    (x.TEnd!.Value -
-                                     x.TLogin!.Value)
+                                    (x.TEnd!.Value - x.TLogin!.Value)
                                     .TotalMinutes)
                                 .Where(x => x >= 0)
                                 .ToList();

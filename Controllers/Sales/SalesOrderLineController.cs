@@ -105,6 +105,7 @@ namespace GranitWebApi.Controllers.Sales
                     });
                 }
 
+                // 1. SATIR
                 var line = new SalesOrderLine
                 {
                     SalesOrderId = request.SalesOrderId,
@@ -113,89 +114,95 @@ namespace GranitWebApi.Controllers.Sales
                     Quantity = request.Quantity,
                     ProductName = request.ProductName,
                     CatalogCode = request.CatalogCode,
-
+                    YKFabricCode = request.YKFabricCode,
                     KoliId = request.KoliId,
                     KoliKod = request.KoliKod,
                     KoliIciMiktar = request.KoliIciMiktar
                 };
 
-                var configuration =
-                    new SalesOrderLineCKConfiguration
-                    {
-                        ProductTypeId = request.ProductTypeId,
-                        ProductId = request.ProductId,
-                        CatalogCode = request.ConfigurationCatalogCode,
-                        FootRal = request.FootRal,
-                        BodyWingRal = request.BodyWingRal,
-                        PlasticColor1No = request.PlasticColor1No,
-                        PlasticColor2No = request.PlasticColor2No
-                    };
+                // 2. CONFIGURATION
+                SalesOrderLineCKConfiguration? ckConfiguration = null;
+                SalesOrderLineUMConfiguration? umConfiguration = null;
 
+                // CK
+                if (request.ProductGroupId == "1")
+                {
+                    ckConfiguration =
+                        new SalesOrderLineCKConfiguration
+                        {
+                            ProductTypeId =request.ProductTypeId,
+                            ProductId =request.ProductId,
+                            CatalogCode =request.ConfigurationCatalogCode,
+                            FootRal =request.FootRal,
+                            BodyWingRal =request.BodyWingRal,
+                            PlasticColor1No =request.PlasticColor1No,
+                            PlasticColor2No =request.PlasticColor2No
+                        };
+                }
+
+                // UM
+                else if (request.ProductGroupId == "2")
+                {
+                    umConfiguration =
+                        new SalesOrderLineUMConfiguration
+                        {
+                            BodyType =request.BodyType!,
+                            BodyCode =request.BodyCode!,
+                            IroningBoardCode =request.IroningBoardCode!,
+                            FootCode =request.FootCode!,
+                            BodyIroningRal =request.BodyIroningRal!,
+                            BodyIroningColor =request.BodyIroningColor!,
+                            FootRal =request.FootRal!,
+                            FootColor =request.FootColor!,
+                            FabricCode =request.FabricCode!,
+                            FabricName =request.FabricName!,
+                            SpongeCode =request.SpongeCode!,
+                            SpongeName =request.SpongeName!,
+                            SpongeQuantity =request.SpongeQuantity ?? 0,
+                            HasFis =request.HasFis,
+                            FisType =request.HasFis? request.FisType: null,
+                            FisCode =request.HasFis? request.FisCode: null,
+                            FisName =request.HasFis? request.FisName: null,
+                            PlasticCombinationNo =request.PlasticCombinationNo!,
+                            PlasticCombinationDescription =request.PlasticCombinationDescription!
+                        };
+                }
+
+                // 3. GÖRSELLER
                 var imageFiles = new List<(int ImageTypeId, IFormFile File)>();
-
                 if (request.Files != null && request.ImageTypeIds != null)
                 {
-                    for (int i = 0; i < request.Files.Count; i++)
+                    for (int i = 0;i < request.Files.Count;i++)
                     {
-                        imageFiles.Add((request.ImageTypeIds[i], request.Files[i]));
+                        imageFiles.Add((request.ImageTypeIds[i],request.Files[i]));
                     }
                 }
 
-                // =====================================================
-                // 5. COMPLETE CREATE
-                // =====================================================
+                // 4. COMPLETE CREATE
+                var result =await _salesOrderLineService.CreateCompleteAsync(line,ckConfiguration,umConfiguration,imageFiles);
 
-                var result =
-                    await _salesOrderLineService
-                        .CreateCompleteAsync(
-                            line,
-                            configuration,
-                            imageFiles);
-
-                // =====================================================
-                // 6. SONUÇ KONTROLÜ
-                // =====================================================
-
+                // 5. SONUÇ KONTROLÜ
                 if (result == null)
                 {
                     return BadRequest(new
                     {
                         success = false,
-                        message =
-                            "Sipariş satırı oluşturulamadı."
+                        message ="Sipariş satırı oluşturulamadı."
                     });
                 }
 
-                // =====================================================
-                // 7. RESPONSE
-                // =====================================================
-
+                // 6. RESPONSE
                 return Ok(new
                 {
                     success = true,
-
-                    id = result.Id,
-
-                    salesOrderId =
-                        result.SalesOrderId,
-
-                    lineNumber =
-                        result.LineNumber,
-
-                    productGroupId =
-                        result.ProductGroupId,
-
-                    productName =
-                        result.ProductName,
-
-                    quantity =
-                        result.Quantity,
-
-                    status =
-                        result.Status,
-
-                    message =
-                        "Sipariş satırı başarıyla oluşturuldu."
+                    id =result.Id,
+                    salesOrderId =result.SalesOrderId,
+                    lineNumber =result.LineNumber,
+                    productGroupId =result.ProductGroupId,
+                    productName =result.ProductName,
+                    quantity =result.Quantity,
+                    status =result.Status,
+                    message ="Sipariş satırı başarıyla oluşturuldu."
                 });
             }
             catch (Exception ex)
@@ -204,8 +211,8 @@ namespace GranitWebApi.Controllers.Sales
                 {
                     success = false,
                     message = ex.Message,
-                    innerException = ex.InnerException?.Message,
-                    innerInnerException = ex.InnerException?.InnerException?.Message
+                    innerException =ex.InnerException?.Message,
+                    innerInnerException =ex.InnerException?.InnerException?.Message
                 });
             }
         }
@@ -343,7 +350,6 @@ namespace GranitWebApi.Controllers.Sales
                 {
                     return NotFound(new { success = false, message = "Sipariş satırı bulunamadı." });
                 }
-
                 return Ok(new
                 {
                     success = true,
