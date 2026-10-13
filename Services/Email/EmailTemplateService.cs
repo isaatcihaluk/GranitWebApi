@@ -11,9 +11,7 @@ namespace GranitWebApi.Services.Email
             _environment = environment;
         }
 
-        public async Task<string> RenderAsync(
-            string templateName,
-            Dictionary<string, string> values)
+        public async Task<string> RenderAsync(string templateName,Dictionary<string, string> values)
         {
             var templateFolder = Path.Combine(
                 _environment.ContentRootPath,

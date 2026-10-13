@@ -1,6 +1,7 @@
 ﻿using GranitWebApi.Configurations;
 using GranitWebApi.Data;
 using GranitWebApi.Helpers;
+using GranitWebApi.Models.Helpers;
 using GranitWebApi.Services;
 using GranitWebApi.Services.BackgroundServices;
 using GranitWebApi.Services.Email;
@@ -179,10 +180,12 @@ builder.Services.AddScoped<ISalesOrderFormService, SalesOrderFormService>();
 builder.Services.AddScoped<SalesOrderExcelService>();
 builder.Services.AddScoped<ISalesOrderMailService, SalesOrderMailService>();
 builder.Services.AddScoped<ISalesOrderLineUMConfigurationService,SalesOrderLineUMConfigurationService>();
+builder.Services.AddScoped<BUProductDefinitionService>();
 
 //PROFORMA
 builder.Services.AddScoped<ISalesProformaService,SalesProformaService>();
 builder.Services.AddScoped<IWorkflowProcessHandler,SalesProformaWorkflowHandler>();
+builder.Services.AddScoped<ISalesProformaPdfService, SalesProformaPdfService>();
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 

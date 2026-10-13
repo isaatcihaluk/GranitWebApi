@@ -26,7 +26,7 @@ namespace GranitWebApi.Services.Sales.Definitions
                     ID,
                     URUN_GRUBU,
                     KISATLMASI
-                FROM GRANIT_TBL_URUN_GRUBU
+                FROM GRANIT_TBL_URUN_GRUBU WHERE ID NOT IN (3,4)
                 ORDER BY ID";
 
             using SqlCommand cmd = new SqlCommand(query, conn);

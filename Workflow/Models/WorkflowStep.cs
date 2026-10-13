@@ -23,6 +23,7 @@ namespace GranitWebApi.Workflow.Models
     {
         public bool PauseWorkflow { get; set; }
         public int CurrentStep { get; set; }
+        public bool CompleteWorkflow { get; set; } = false;
     }
 
     public class WorkflowResubmitResult

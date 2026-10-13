@@ -186,18 +186,29 @@ namespace GranitWebApi.Workflow.Services
                 if (stepCompleted)
                 {
                     var handler = await GetProcessHandlerAsync(request.ProcessTypeId);
+
                     if (handler != null)
                     {
-                        stepResult = await handler.OnStepCompletedAsync(request,approval.StepOrder,userId);
+                        stepResult = await handler.OnStepCompletedAsync(
+                            request,
+                            approval.StepOrder,
+                            userId);
                     }
-                    if (stepResult == null || !stepResult.PauseWorkflow)
-                    {
-                        await ActivateNextStep(request,approval.StepOrder);
-                    }
-                    else
+
+                    if (stepResult?.PauseWorkflow == true)
                     {
                         request.Status = WorkflowStatus.Onayda.ToString();
                         request.CurrentStep = stepResult.CurrentStep;
+                    }
+                    else if (stepResult?.CompleteWorkflow == true)
+                    {
+                        request.Status = WorkflowStatus.Tamamlandi.ToString();
+                        request.IsCompleted = true;
+                        request.CurrentStep = 0;
+                    }
+                    else
+                    {
+                        await ActivateNextStep(request, approval.StepOrder);
                     }
                 }
 
@@ -550,7 +561,6 @@ namespace GranitWebApi.Workflow.Services
         #endregion
 
         #region Activate Step
-
         public async Task ActivateStepAsync(int requestId,int stepOrder,int userId,string? comment = null)
         {
             var request = await _context.ProcessRequest
@@ -601,7 +611,6 @@ namespace GranitWebApi.Workflow.Services
         #endregion
 
         #region Workflow Definition
-
         private async Task<WorkflowDefinition>GetWorkflowDefinitionAsync(int processTypeId)
         {
             var workflow = await _context.WorkflowDefinition.Include(x => x.Steps)

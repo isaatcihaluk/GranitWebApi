@@ -265,6 +265,7 @@ namespace GranitWebApi.Services.Sales
                     if (string.IsNullOrWhiteSpace(line.CatalogCode)) { throw new Exception("Yedek kılıf türü belirtilmelidir."); }
                     if (string.IsNullOrWhiteSpace(line.YKFabricCode)) { throw new Exception("Yedek kılıf kumaşı belirtilmelidir."); }
                 }
+
                 else
                 {
                     throw new Exception(
@@ -317,8 +318,50 @@ namespace GranitWebApi.Services.Sales
                     if (string.IsNullOrWhiteSpace(line.CatalogCode)) { throw new Exception("Yedek kılıf türü belirtilmelidir."); }
                     if (string.IsNullOrWhiteSpace(line.YKFabricCode)) { throw new Exception("Yedek kılıf kumaşı belirtilmelidir."); }
                 }
+                else if (line.ProductGroupId == "3")
+                {
+                    // =====================================================
+                    // BU VALIDATION
+                    // =====================================================
 
-                await _context.SaveChangesAsync();
+                    if (string.IsNullOrWhiteSpace(line.CatalogCode))
+                    {
+                        throw new Exception("Katalog kodu belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUColorRal))
+                    {
+                        throw new Exception("Renk belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUColorDescription))
+                    {
+                        throw new Exception("Renk açıklaması belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUPlasticRal))
+                    {
+                        throw new Exception("Plastik RAL belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUPlasticColor))
+                    {
+                        throw new Exception("Plastik rengi belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUEtiketAkmazCode))
+                    {
+                        throw new Exception("Etiket akmaz belirtilmelidir.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line.BUFabricsCode))
+                    {
+                        throw new Exception("Kumaş belirtilmelidir.");
+                    }
+                }
+                else if (line.ProductGroupId == "5")
+
+                    await _context.SaveChangesAsync();
                 var rootPath = _configuration["FileStorage:RootPath"];
 
                 if (string.IsNullOrWhiteSpace(rootPath)) { throw new Exception("FileStorage:RootPath tanımlı değil."); }

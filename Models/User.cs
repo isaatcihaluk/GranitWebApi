@@ -1,4 +1,5 @@
 ﻿using GranitWebApi.Models.Sabitler.Users;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GranitWebApi.Models
 {
@@ -32,5 +33,16 @@ namespace GranitWebApi.Models
         public bool MustChangePassword { get; set; }
         public bool IsManual { get; set; }
         public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+    }
+    [Table("UserMailRole")]
+    public class UserMailRole
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string MailType { get; set; } = string.Empty;
+        public string MailRole { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedDate { get; set; }
+        public int? CreatedBy { get; set; }
     }
 }

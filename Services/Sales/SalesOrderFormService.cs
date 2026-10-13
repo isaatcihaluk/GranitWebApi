@@ -152,6 +152,7 @@ namespace GranitWebApi.Services.Sales
                     {
                         SalesOrderLineId = orderLine.Id,
                         Quantity = packageLine.Quantity,
+                        ProductGroupId = orderLine.ProductGroupId,
                         ProductName = orderLine.ProductName,
                         CatalogCode = orderLine.CatalogCode,
                         ShrinkliKod = orderLine.ShrinkliKod,

@@ -17,5 +17,7 @@ namespace GranitWebApi.Services.Proforma
         Task<bool> CreatePaymentAsync(int proformaId,SalesProformaPaymentRequest request,int userId);
         Task<bool> SubmitPaymentForFinanceAsync(int proformaId,int userId);
         Task<SalesOrder?> ConvertToOrderAsync(int proformaId, int userId);
+        Task<SalesProformaDocumentResult> UploadDocumentAsync(long proformaId,IFormFile file,int userId);
+        Task<(bool Basarili, string Aciklama, byte[]? FileBytes, string? FileName, string? ContentType)> GetDocumentFileAsync(long proformaId);
     }
 }

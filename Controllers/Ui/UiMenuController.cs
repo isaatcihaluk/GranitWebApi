@@ -19,8 +19,19 @@ public class UiMenuController : ControllerBase
     [HttpGet("menu")]
     public async Task<IActionResult> GetMenu(CancellationToken cancellationToken)
     {
-        var result = await _service.GetMenuAsync(cancellationToken);
-
-        return Ok(result);
+        try
+        {
+            var result = await _service.GetMenuAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = ex.Message,
+                inner = ex.InnerException?.Message,
+                stack = ex.StackTrace
+            });
+        }
     }
 }

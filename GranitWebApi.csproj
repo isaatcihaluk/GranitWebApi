@@ -29,6 +29,7 @@
 	<ItemGroup>
 		<PackageReference Include="ClosedXML" Version="0.105.1" />
 		<PackageReference Include="Dapper" Version="2.1.72" />
+		<PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
 		<PackageReference Include="MailKit" Version="4.17.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
@@ -48,6 +49,7 @@
 	<ItemGroup>
 		<Folder Include="Controllers\Workflow\" />
 		<Folder Include="logs\" />
+		<Folder Include="Services\Proforma\Assets\" />
 		<Folder Include="Workflow\DTO\" />
 		<Folder Include="Workflow\Engine\" />
 		<Folder Include="Workflow\Helpers\" />

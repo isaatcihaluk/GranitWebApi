@@ -14,7 +14,7 @@ namespace GranitWebApi.Services.Proforma
 
         public SalesProformaWorkflowHandler(AppDbContext context, WorkflowNotificationService notificationService)
         {
-            _context = context; 
+            _context = context;
             _notificationService = notificationService;
         }
 
@@ -60,6 +60,18 @@ namespace GranitWebApi.Services.Proforma
              * Daha sonra finans step'i manuel olarak
              * aktive edilir.
              */
+            if (completedStep == 1 &&
+    IsCashAgainstDocumentsProforma(request))
+            {
+                result.CompleteWorkflow = true;
+                return result;
+            }
+            if (completedStep == 1 &&
+    IsDeferredPaymentWorkflow(request))
+            {
+                result.CompleteWorkflow = true;
+                return result;
+            }
             if (completedStep == 1 &&
                 IsPrepaymentWorkflow(request))
             {
@@ -323,33 +335,67 @@ namespace GranitWebApi.Services.Proforma
 
         #region Payment Workflow
 
-        private bool IsPrepaymentWorkflow(
-            ProcessRequest request)
+        private bool IsPrepaymentWorkflow(ProcessRequest request)
         {
-            if (string.IsNullOrWhiteSpace(
-                request.Parameters))
-            {
+            if (string.IsNullOrWhiteSpace(request.Parameters))
                 return false;
+
+            using var doc = JsonDocument.Parse(request.Parameters);
+
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("PaymentType", out var paymentType))
+                return false;
+
+            var paymentTypeValue = paymentType.GetString();
+
+            // Ön ödemeli mevcut davranışını koru.
+            if (paymentTypeValue == "ON_ODEMELI")
+                return true;
+
+            // Peşin ödeme, ödeme koşuluna göre değerlendirilir.
+            if (paymentTypeValue == "PESIN")
+            {
+                if (!root.TryGetProperty("PaymentCondition", out var paymentCondition))
+                    return true; // Mevcut kayıtlarla geriye dönük uyumluluk.
+
+                return paymentCondition.GetString() != "CASH_AGAINST_DOCUMENTS";
             }
 
-            using var doc =
-                JsonDocument.Parse(
-                    request.Parameters);
-
-            if (!doc.RootElement.TryGetProperty(
-                    "PaymentType",
-                    out var paymentType))
-            {
-                return false;
-            }
-
-            var value =
-                paymentType.GetString();
-
-            return value == "PESIN" ||
-                   value == "ON_ODEMELI";
+            // VADELI ve LC bu akışa dahil değildir.
+            return false;
         }
 
+
         #endregion
+        private bool IsCashAgainstDocumentsProforma(
+    ProcessRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Parameters))
+                return false;
+
+            using var doc = JsonDocument.Parse(request.Parameters);
+            var root = doc.RootElement;
+
+            return root.TryGetProperty("PaymentType", out var paymentType)
+                && paymentType.GetString() == "PESIN"
+                && root.TryGetProperty("PaymentCondition", out var paymentCondition)
+                && paymentCondition.GetString() == "CASH_AGAINST_DOCUMENTS";
+        }
+        private bool IsDeferredPaymentWorkflow(ProcessRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Parameters))
+                return false;
+
+            using var doc = JsonDocument.Parse(request.Parameters);
+
+            var root = doc.RootElement;
+
+            return root.TryGetProperty("PaymentType", out var paymentType)
+                && string.Equals(
+                    paymentType.GetString(),
+                    "VADELI",
+                    StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

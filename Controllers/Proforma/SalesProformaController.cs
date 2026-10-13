@@ -27,15 +27,17 @@ namespace GranitWebApi.Controllers.Proforma
         private readonly IWorkflowService _workflowService;
         private readonly ErpDbContext _erpContext;
         private readonly AppDbContext _context;
+        private readonly ISalesProformaPdfService _proformaPdfService;
 
-        public SalesProformaController(ISalesProformaService proformaService,UserContext userContext,
-            IWorkflowService workflowService,ErpDbContext erpContext,AppDbContext context)
+        public SalesProformaController(ISalesProformaService proformaService, UserContext userContext,
+            IWorkflowService workflowService, ErpDbContext erpContext, AppDbContext context, ISalesProformaPdfService proformaPdfService)
         {
             _proformaService = proformaService;
             _userContext = userContext;
             _workflowService = workflowService;
             _erpContext = erpContext;
             _context = context;
+            _proformaPdfService = proformaPdfService;
         }
 
         #region Get List
@@ -90,7 +92,7 @@ namespace GranitWebApi.Controllers.Proforma
         {
             try
             {
-                var result = await _proformaService.CreateAsync(proforma,_userContext.UserId);
+                var result = await _proformaService.CreateAsync(proforma, _userContext.UserId);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -107,11 +109,11 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Update
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id,[FromBody] SalesProformaModel proforma)
+        public async Task<IActionResult> Update(int id, [FromBody] SalesProformaModel proforma)
         {
             try
             {
-                var result = await _proformaService.UpdateAsync(id,proforma,_userContext.UserId);
+                var result = await _proformaService.UpdateAsync(id, proforma, _userContext.UserId);
 
                 if (result == null)
                 {
@@ -134,7 +136,7 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Workflow - Submit
         [HttpPost("workflow/{id:int}/submit")]
-        public async Task<IActionResult> Submit(int id,[FromBody] string? comment)
+        public async Task<IActionResult> Submit(int id, [FromBody] string? comment)
         {
             try
             {
@@ -172,12 +174,12 @@ namespace GranitWebApi.Controllers.Proforma
                     EntityId = proforma.Id,
                     Status = WorkflowStatus.Taslak.ToString(),
                     IsVisibleToHR = false,
-                    Parameters = JsonSerializer.Serialize(new {PaymentType = proforma.PaymentType})
+                    Parameters = JsonSerializer.Serialize(new { PaymentType = proforma.PaymentType, PaymentCondition = proforma.PaymentCondition })
                 };
 
-                var requestId = await _workflowService.StartAndSubmitAsync(request,comment ?? "Proforma onaya gönderildi.");
+                var requestId = await _workflowService.StartAndSubmitAsync(request, comment ?? "Proforma onaya gönderildi.");
 
-                var saved = await _proformaService.SetWorkflowAsync(id,requestId,"ONAY_BEKLIYOR",_userContext.UserId);
+                var saved = await _proformaService.SetWorkflowAsync(id, requestId, "ONAY_BEKLIYOR", _userContext.UserId);
                 if (!saved)
                 {
                     return StatusCode(500, new
@@ -209,7 +211,7 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Workflow - Return
         [HttpPost("workflow/{id:int}/return")]
-        public async Task<IActionResult> Return(int id,[FromBody] string? comment)
+        public async Task<IActionResult> Return(int id, [FromBody] string? comment)
         {
             try
             {
@@ -221,8 +223,8 @@ namespace GranitWebApi.Controllers.Proforma
                         message = "Proforma bulunamadı."
                     });
                 }
-                if (proforma.ProcessRequestId == null || 
-                    !new[] {"ONAY_BEKLIYOR","FINANS_ONAY_BEKLIYOR","ON_ODEME_BEKLIYOR"}.Contains(proforma.Status))
+                if (proforma.ProcessRequestId == null ||
+                    !new[] { "ONAY_BEKLIYOR", "FINANS_ONAY_BEKLIYOR", "ON_ODEME_BEKLIYOR" }.Contains(proforma.Status))
                 {
                     return BadRequest(new
                     {
@@ -230,7 +232,7 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                await _workflowService.ReturnAsync(proforma.ProcessRequestId.Value,_userContext.UserId,comment);
+                await _workflowService.ReturnAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment);
 
                 return Ok(new
                 {
@@ -254,7 +256,7 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Workflow - Resubmit
         [HttpPost("workflow/{id:int}/resubmit")]
-        public async Task<IActionResult> Resubmit(int id,[FromBody] string? comment)
+        public async Task<IActionResult> Resubmit(int id, [FromBody] string? comment)
         {
             try
             {
@@ -290,10 +292,10 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                var parameters = JsonSerializer.Serialize(new {PaymentType = proforma.PaymentType});
+                var parameters = JsonSerializer.Serialize(new { PaymentType = proforma.PaymentType, PaymentCondition = proforma.PaymentCondition });
 
-                await _workflowService.ResubmitAsync(proforma.ProcessRequestId.Value,_userContext.UserId,
-                    comment ?? "Revize sonrası tekrar onaya gönderildi.",parameters);
+                await _workflowService.ResubmitAsync(proforma.ProcessRequestId.Value, _userContext.UserId,
+                    comment ?? "Revize sonrası tekrar onaya gönderildi.", parameters);
 
                 return Ok(new
                 {
@@ -316,7 +318,7 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Workflow - Cancel
         [HttpPost("workflow/{id:int}/cancel")]
-        public async Task<IActionResult> Cancel(int id,[FromBody] string? comment)
+        public async Task<IActionResult> Cancel(int id, [FromBody] string? comment)
         {
             try
             {
@@ -329,7 +331,7 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                var allowedStatuses = new[] {"TASLAK","ONAY_BEKLIYOR","REVIZE","ON_ODEME_BEKLIYOR"};
+                var allowedStatuses = new[] { "TASLAK", "ONAY_BEKLIYOR", "REVIZE", "ON_ODEME_BEKLIYOR" };
                 if (!allowedStatuses.Contains(proforma.Status))
                 {
                     return BadRequest(new
@@ -340,10 +342,10 @@ namespace GranitWebApi.Controllers.Proforma
 
                 if (proforma.ProcessRequestId.HasValue)
                 {
-                    await _workflowService.CancelAsync(proforma.ProcessRequestId.Value,_userContext.UserId,comment ?? "Proforma iptal edildi.");
+                    await _workflowService.CancelAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment ?? "Proforma iptal edildi.");
                 }
 
-                var saved = await _proformaService.UpdateStatusAsync(id,"IPTAL",_userContext.UserId);
+                var saved = await _proformaService.UpdateStatusAsync(id, "IPTAL", _userContext.UserId);
 
                 if (!saved)
                 {
@@ -375,7 +377,7 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Workflow - Approve
         [HttpPost("workflow/{id:int}/approve")]
-        public async Task<IActionResult> Approve(int id,[FromBody] string? comment)
+        public async Task<IActionResult> Approve(int id, [FromBody] string? comment)
         {
             try
             {
@@ -395,7 +397,7 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                await _workflowService.ApproveAsync(proforma.ProcessRequestId.Value,_userContext.UserId,comment);
+                await _workflowService.ApproveAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment);
 
                 return Ok(new
                 {
@@ -418,12 +420,12 @@ namespace GranitWebApi.Controllers.Proforma
 
         #region Payment
         [HttpPost("{id}/payment")]
-        public async Task<IActionResult> CreatePayment(int id,[FromBody] SalesProformaPaymentRequest request)
+        public async Task<IActionResult> CreatePayment(int id, [FromBody] SalesProformaPaymentRequest request)
         {
             try
             {
                 var userId = _userContext.UserId;
-                var result = await _proformaService.CreatePaymentAsync(id,request,userId);
+                var result = await _proformaService.CreatePaymentAsync(id, request, userId);
 
                 if (!result)
                 {
@@ -486,8 +488,8 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                await _proformaService.SubmitPaymentForFinanceAsync(id,userId);
-                await _workflowService.ActivateStepAsync(proforma.ProcessRequestId.Value,2,userId,"Ödeme bilgileri girildi, finans onayına gönderildi.");
+                await _proformaService.SubmitPaymentForFinanceAsync(id, userId);
+                await _workflowService.ActivateStepAsync(proforma.ProcessRequestId.Value, 2, userId, "Ödeme bilgileri girildi, finans onayına gönderildi.");
 
                 return Ok(new
                 {
@@ -536,7 +538,7 @@ namespace GranitWebApi.Controllers.Proforma
             if (processRequest == null) return NotFound("Proforma için workflow kaydı bulunamadı.");
 
             var history = await _context.WorkflowHistory.AsNoTracking()
-                .Where(x => x.RequestId == processRequest.Id && x.ActionType==3)
+                .Where(x => x.RequestId == processRequest.Id && x.ActionType == 3)
                 .OrderBy(x => x.ActionDate)
                 .Select(x => new
                 {
@@ -560,7 +562,7 @@ namespace GranitWebApi.Controllers.Proforma
         {
             try
             {
-                var result = await _proformaService.ConvertToOrderAsync(id,_userContext.UserId);
+                var result = await _proformaService.ConvertToOrderAsync(id, _userContext.UserId);
                 if (result == null)
                 {
                     return NotFound(new
@@ -582,12 +584,95 @@ namespace GranitWebApi.Controllers.Proforma
                 return BadRequest(new
                 {
                     basarili = false,
-                    message = ex.Message
+                    message = ex.Message,
+                    innerException = ex.InnerException?.Message,
+                    innerException2 = ex.InnerException?.InnerException?.Message
                 });
             }
         }
 
         #endregion
 
+        #region Doc
+
+        [HttpPost("{id}/document")]
+        public async Task<IActionResult> UploadDocument(
+            long id,
+            IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Proforma dosyası seçilmelidir."
+                });
+            }
+
+            var result = await _proformaService.UploadDocumentAsync(
+                id,
+                file,
+                _userContext.UserId);
+
+            if (!result.Basarili)
+            {
+                return BadRequest(new
+                {
+                    message = result.Aciklama
+                });
+            }
+
+            return Ok(result);
+        }
+
+        [HttpGet("{id}/document")]
+        public async Task<IActionResult> GetDocument(long id)
+        {
+            var result = await _proformaService.GetDocumentFileAsync(id);
+
+            if (!result.Basarili || result.FileBytes == null)
+            {
+                return NotFound(new
+                {
+                    message = result.Aciklama
+                });
+            }
+
+            return File(
+                result.FileBytes,
+                result.ContentType ?? "application/pdf",
+                result.FileName,
+                enableRangeProcessing: true);
+        }
+
+        #endregion
+
+        [HttpPost("{id:int}/generate-pdf")]
+        public async Task<IActionResult> GeneratePdf(int id)
+        {
+            try
+            {
+                var result = await _proformaPdfService.GenerateAndSaveAsync(
+                    id,
+                    _userContext.UserId);
+
+                if (!result.Basarili)
+                {
+                    return BadRequest(new
+                    {
+                        message = result.Aciklama
+                    });
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message,
+                    innerException = ex.InnerException?.Message
+                });
+            }
+        }
     }
 }

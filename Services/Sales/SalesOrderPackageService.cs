@@ -871,7 +871,7 @@ namespace GranitWebApi.Services.Sales
         }
 
         // YK PAKET KODU / ADI OLUŞTUR
-        private async Task<PackageInfo> GenerateYkPackageInfoAsync(SalesOrderPackage package,List<SalesOrderLine> orderLines)
+        private async Task<PackageInfo> GenerateYkPackageInfoAsync(SalesOrderPackage package, List<SalesOrderLine> orderLines)
         {
             if (orderLines == null || orderLines.Count != 1)
             {
@@ -922,7 +922,7 @@ namespace GranitWebApi.Services.Sales
             if (brosurImage != null)
             {
                 technicalItem = await _context.SalesOrderLineTechnicalItems
-                    .FirstOrDefaultAsync(x =>x.SalesOrderLineId == line.Id && x.ImageId == brosurImage.Id && x.IsActive);
+                    .FirstOrDefaultAsync(x => x.SalesOrderLineId == line.Id && x.ImageId == brosurImage.Id && x.IsActive);
 
                 if (technicalItem != null && !string.IsNullOrWhiteSpace(technicalItem.StockCode))
                 {
@@ -935,7 +935,7 @@ namespace GranitWebApi.Services.Sales
             }
 
             // YK paket kodu:
-            var packageCode =    $"{line.CatalogCode.Trim()}.{fabricCode}.0092.{lastThreeChars}";
+            var packageCode = $"{line.CatalogCode.Trim()}.{fabricCode}.0092.{lastThreeChars}";
 
             // Paket adı
             string brosurSuffix;
@@ -951,7 +951,7 @@ namespace GranitWebApi.Services.Sales
             {
                 if (technicalItem != null && !string.IsNullOrWhiteSpace(technicalItem.StockName))
                 {
-                    var match = Regex.Match(technicalItem.StockName,@"\(([^()]*)\)");
+                    var match = Regex.Match(technicalItem.StockName, @"\(([^()]*)\)");
 
                     if (match.Success)
                     {
@@ -984,7 +984,8 @@ namespace GranitWebApi.Services.Sales
         // PAKETLEMEYİ TAMAMLA
         public async Task CompletePackagingAsync(long salesOrderId)
         {
-            var order = await _context.SalesOrders.FirstOrDefaultAsync(x => x.Id == salesOrderId);
+            var order = await _context.SalesOrders
+                .FirstOrDefaultAsync(x => x.Id == salesOrderId);
 
             if (order == null)
             {
@@ -993,103 +994,246 @@ namespace GranitWebApi.Services.Sales
 
             if (order.Status != "PAKETLEME")
             {
-                throw new Exception("Bu sipariş paketleme aşamasında değil.");
+                throw new Exception(
+                    "Bu sipariş paketleme aşamasında değil.");
             }
 
             var orderLines = await _context.SalesOrderLines
-                .Where(x =>x.SalesOrderId == salesOrderId && !x.DeletedFlag).ToListAsync();
+                .Where(x =>
+                    x.SalesOrderId == salesOrderId &&
+                    !x.DeletedFlag)
+                .ToListAsync();
 
             if (orderLines.Count == 0)
             {
-                throw new Exception("Siparişte aktif sipariş kalemi bulunamadı.");
-            }
-
-            var hasPhysicalPackagingRequired = orderLines.Any(x =>
-                x.ProductGroupId == "1" ||
-                x.ProductGroupId == "2");
-
-            var hasActivePackage = await _context.SalesOrderPackages
-                .AnyAsync(x =>
-                    x.SalesOrderId == salesOrderId &&
-                    x.Status != "IPTAL");
-
-            // CK / UM varsa fiziksel paket oluşturulmuş olmalıdır.
-            // Sadece YK siparişinde fiziksel paket zorunlu değildir.
-            if (hasPhysicalPackagingRequired && !hasActivePackage)
-            {
                 throw new Exception(
-                    "Paketleme tamamlanmadan önce " +
-                    "en az bir paket oluşturulmalıdır.");
+                    "Siparişte aktif sipariş kalemi bulunamadı.");
             }
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            // =========================================================
+            // CK / UM PAKET KONTROLÜ
+            // =========================================================
+
+            var requiredPackagingLines = orderLines
+                .Where(x =>
+                    (x.ProductGroupId == "1" ||
+                     x.ProductGroupId == "2") &&
+                    !string.IsNullOrWhiteSpace(x.ShrinkliKod))
+                .ToList();
+
+            if (requiredPackagingLines.Count > 0)
+            {
+                var requiredLineIds = requiredPackagingLines
+                    .Select(x => x.Id)
+                    .ToList();
+
+                var packagedLineIds = await
+                    (
+                        from packageLine
+                        in _context.SalesOrderPackageLines
+
+                        join package
+                        in _context.SalesOrderPackages
+                        on packageLine.SalesOrderPackageId
+                            equals package.Id
+
+                        where
+                            package.SalesOrderId == salesOrderId &&
+                            package.Status != "IPTAL" &&
+                            packageLine.Quantity > 0 &&
+                            requiredLineIds.Contains(
+                                packageLine.SalesOrderLineId)
+
+                        select packageLine.SalesOrderLineId
+                    )
+                    .Distinct()
+                    .ToListAsync();
+
+                var missingLines = requiredPackagingLines
+                    .Where(x =>
+                        !packagedLineIds.Contains(x.Id))
+                    .ToList();
+
+                if (missingLines.Count > 0)
+                {
+                    throw new Exception(
+                        "Aşağıdaki CK / UM sipariş kalemleri " +
+                        "paketlenmemiş: " +
+                        string.Join(
+                            ", ",
+                            missingLines.Select(x =>
+                                $"{x.Id} - {x.ShrinkliKod}")));
+                }
+            }
+
+            // =========================================================
+            // TRANSACTION
+            // =========================================================
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
             try
             {
-                // YK OTOMATİK PAKET OLUŞTURMA
+                // =====================================================
+                // YK OTOMATİK PAKETLEME
+                // =====================================================
+                //
+                // ProductGroupId = 5 -> YK
+                //
+                // YK'nın aktif paketi yoksa otomatik oluşturulur.
+                // Aktif paketi varsa tekrar oluşturulmaz.
+                // IPTAL paketler dikkate alınmaz.
+                //
 
-                var ykLines = orderLines.Where(x => x.ProductGroupId == "5").ToList();
+                var ykLines = orderLines
+                    .Where(x => x.ProductGroupId == "5")
+                    .ToList();
+
                 if (ykLines.Count > 0)
                 {
-                    var lastPackageNumber = await _context.SalesOrderPackages
-                        .Where(x => x.SalesOrderId == salesOrderId)
-                        .Select(x => (int?)x.PackageNumber)
-                        .MaxAsync() ?? 0;
+                    var ykLineIds = ykLines
+                        .Select(x => x.Id)
+                        .ToList();
 
-                    var nextPackageNumber = lastPackageNumber + 1;
-                    var now = DateTime.Now;
+                    // Aktif pakette bulunan YK kalemlerini bul
+                    var alreadyPackagedYkLineIds =
+                        await
+                        (
+                            from packageLine
+                            in _context.SalesOrderPackageLines
 
-                    foreach (var ykLine in ykLines)
+                            join package
+                            in _context.SalesOrderPackages
+                            on packageLine.SalesOrderPackageId
+                                equals package.Id
+
+                            where
+                                package.SalesOrderId == salesOrderId &&
+                                package.Status != "IPTAL" &&
+                                packageLine.Quantity > 0 &&
+                                ykLineIds.Contains(
+                                    packageLine.SalesOrderLineId)
+
+                            select packageLine.SalesOrderLineId
+                        )
+                        .Distinct()
+                        .ToListAsync();
+
+                    // Sadece daha önce paketlenmemiş YK kalemleri
+                    var ykLinesToPackage = ykLines
+                        .Where(x =>
+                            !alreadyPackagedYkLineIds.Contains(x.Id))
+                        .ToList();
+
+                    if (ykLinesToPackage.Count > 0)
                     {
-                        var package = new SalesOrderPackage
+                        var lastPackageNumber =
+                            await _context.SalesOrderPackages
+                                .Where(x =>
+                                    x.SalesOrderId == salesOrderId)
+                                .Select(x =>
+                                    (int?)x.PackageNumber)
+                                .MaxAsync() ?? 0;
+
+                        var nextPackageNumber =
+                            lastPackageNumber + 1;
+
+                        var now = DateTime.Now;
+
+                        foreach (var ykLine in ykLinesToPackage)
                         {
-                            SalesOrderId = salesOrderId,
-                            PackageNumber = nextPackageNumber,
+                            var package =
+                                new SalesOrderPackage
+                                {
+                                    SalesOrderId =
+                                        salesOrderId,
 
-                            // YK fiziksel koli kullanmaz.
-                            // Sistemsel olarak özel koli değeri kullanılır.
-                            KoliId = "9999999",
-                            KoliKod= "3301.2232.340.0510.0240.0092",
-                            KoliIciMiktar=15,
+                                    PackageNumber =
+                                        nextPackageNumber,
 
-                            Status = "TASLAK",
-                            CreatedAt = now,
-                            CreatedBy = _userContext.UserId
-                        };
+                                    // YK fiziksel koli kullanmaz.
+                                    KoliId =
+                                        "9999999",
 
-                        var packageInfo = await GenerateYkPackageInfoAsync(package,new List<SalesOrderLine> { ykLine });
+                                    KoliKod =
+                                        "3301.2232.340.0510.0240.0092",
 
-                        package.NetsisPaketKodu = packageInfo.Code;
-                        package.NetsisPaketAdi = packageInfo.Name;
+                                    KoliIciMiktar =
+                                        15,
 
-                        package.Lines.Add(
-                            new SalesOrderPackageLine
-                            {
-                                SalesOrderLineId = ykLine.Id,
-                                Quantity = ykLine.Quantity,
-                                CreatedAt = now,
-                                CreatedBy = _userContext.UserId
-                            });
+                                    Status =
+                                        "TASLAK",
 
-                        _context.SalesOrderPackages.Add(package);
-                        nextPackageNumber++;
+                                    CreatedAt =
+                                        now,
+
+                                    CreatedBy =
+                                        _userContext.UserId
+                                };
+
+                            var packageInfo =
+                                await GenerateYkPackageInfoAsync(
+                                    package,
+                                    new List<SalesOrderLine>
+                                    {
+                                ykLine
+                                    });
+
+                            package.NetsisPaketKodu =
+                                packageInfo.Code;
+
+                            package.NetsisPaketAdi =
+                                packageInfo.Name;
+
+                            package.Lines.Add(
+                                new SalesOrderPackageLine
+                                {
+                                    SalesOrderLineId =
+                                        ykLine.Id,
+
+                                    Quantity =
+                                        ykLine.Quantity,
+
+                                    CreatedAt =
+                                        now,
+
+                                    CreatedBy =
+                                        _userContext.UserId
+                                });
+
+                            _context.SalesOrderPackages.Add(
+                                package);
+
+                            nextPackageNumber++;
+                        }
+
+                        await _context.SaveChangesAsync();
                     }
-                    await _context.SaveChangesAsync();
                 }
 
+                // =====================================================
                 // PAKETLEMEYİ TAMAMLA
+                // =====================================================
+
                 order.Status = "FIYATLANDIRMA";
                 order.UpdatedAt = DateTime.Now;
                 order.UpdatedBy = _userContext.UserId;
+
                 await _context.SaveChangesAsync();
+
                 await transaction.CommitAsync();
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                throw new Exception(ex.InnerException?.Message ?? ex.Message,ex); 
+
+                throw new Exception(
+                    ex.InnerException?.Message ?? ex.Message,
+                    ex);
             }
         }
+
         // BEKLENEN REÇETE OLUŞTUR
         private async Task<List<RecipeComponent>> BuildExpectedRecipeAsync(SalesOrderPackage package, List<SalesOrderLine> orderLines)
         {

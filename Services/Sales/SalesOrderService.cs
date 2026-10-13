@@ -1039,5 +1039,59 @@ namespace GranitWebApi.Services.Sales
             await _context.SaveChangesAsync();
             return existingOrder;
         }
+        public async Task<SalesOrderMailResult> SendRevisionMailAsync(long salesOrderId,string revisionDescription)
+        {
+            var salesOrder = await _context.SalesOrders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == salesOrderId);
+
+            if (salesOrder == null)
+            {
+                return new SalesOrderMailResult
+                {
+                    Basarili = false,
+                    Hata = true,
+                    SalesOrderId = salesOrderId,
+                    Aciklama = $"Satış siparişi bulunamadı. Id: {salesOrderId}"
+                };
+            }
+
+            if (salesOrder.Status != "TAMAMLANDI")
+            {
+                return new SalesOrderMailResult
+                {
+                    Basarili = false,
+                    Hata = true,
+                    SalesOrderId = salesOrderId,
+                    Aciklama = "Revize maili yalnızca TAMAMLANDI durumundaki siparişler için gönderilebilir."
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(revisionDescription))
+            {
+                return new SalesOrderMailResult
+                {
+                    Basarili = false,
+                    Hata = true,
+                    SalesOrderId = salesOrderId,
+                    Aciklama = "Revize konusu boş bırakılamaz."
+                };
+            }
+
+            try
+            {
+                var mailResult = await _salesOrderMailService.SendRevisionMailAsync(salesOrderId,revisionDescription.Trim());
+
+                return mailResult;
+            }
+            catch (Exception ex)
+            {
+                return new SalesOrderMailResult
+                {
+                    Basarili = false,
+                    Hata = true,
+                    SalesOrderId = salesOrderId,
+                    Aciklama = $"Revize maili gönderilirken hata oluştu: {ex.Message}"
+                };
+            }
+        }
     }
 }

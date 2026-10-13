@@ -59,9 +59,9 @@ namespace GranitWebApi.Data
             modelBuilder.Entity<ProductType>().HasNoKey();
             modelBuilder.Entity<CKProductDetailMain>().HasNoKey();
             modelBuilder.Entity<CKProductDetailColor>().HasNoKey();
-            modelBuilder.Entity<SalesCustomer>()
-                .HasNoKey()
-                .ToView("granitVW_SALES_CUSTOMERS");
+            modelBuilder.Entity<BUProductDetail>().HasNoKey();
+            modelBuilder.Entity<BUProductDetailColor>().HasNoKey();
+            modelBuilder.Entity<SalesCustomer>().HasNoKey().ToView("granitVW_SALES_CUSTOMERS");
 
             // Sales Order Package
 
@@ -162,6 +162,7 @@ namespace GranitWebApi.Data
         public DbSet<Roles> Roles { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<UserMailRole> UserMailRoles { get; set; }
 
         // Sales Order
         public DbSet<SalesOrder> SalesOrders { get; set; }
@@ -186,10 +187,16 @@ namespace GranitWebApi.Data
         public DbSet<PaketRenk> PaketRenkler { get; set; } = null!;
         public DbSet<ProductShrink> ProductShrinks { get; set; }
         public DbSet<UmUrunDetayAna> UmUrunDetayAna { get; set; }
+        public DbSet<BUProductDetail> BUProductDetails { get; set; }
+        public DbSet<BUProductDetailColor> BUProductDetailColors { get; set; }
 
         // PROFORMA
         public DbSet<SalesProforma> SalesProformas { get; set; }
         public DbSet<SalesProformaLine> SalesProformaLines { get; set; }
         public DbSet<SalesProformaPayment> SalesProformaPayments { get; set; }
+        public DbSet<SalesProformaDocument> SalesProformaDocuments { get; set; }
+
+        // SABITLER
+        public DbSet<BankAccount> BankAccounts { get; set; }
     }
 }

@@ -54,19 +54,12 @@ namespace GranitWebApi.Models.Sales
     public class SalesOrderFormPackageLine
     {
         public long SalesOrderLineId { get; set; }
-
         public decimal Quantity { get; set; }
-
-        // PDF görsel bölümünde hangi ürünün kullanılacağını
-        // belirlemek için
         public string? ProductName { get; set; }
-
+        public string? ProductGroupId { get; set; }
         public string? CatalogCode { get; set; }
-
         public string? ShrinkliKod { get; set; }
-
         public string? ShrinkliAd { get; set; }
-
         public List<SalesOrderFormImage> Images { get; set; } = new();
     }
 

@@ -1,4 +1,5 @@
 ﻿using GranitWebApi.Models.Sales;
+using GranitWebApi.Services.Email.Sales;
 
 namespace GranitWebApi.Services.Sales
 {
@@ -16,5 +17,6 @@ namespace GranitWebApi.Services.Sales
         Task<SalesOrderShrinkRecipePrepareResult> PrepareShrinkRecipesAsync(long salesOrderId);
         Task<SalesOrderPackageRecetePrepareResult> PreparePackageRecipesAsync(long salesOrderId);
         Task<SalesOrderNetsisTransferResult> TransferToNetsisAsync(long salesOrderId);
+        Task<SalesOrderMailResult> SendRevisionMailAsync(long salesOrderId,string revisionDescription);
     }
 }

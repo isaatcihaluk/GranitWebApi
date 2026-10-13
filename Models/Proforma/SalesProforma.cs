@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using GranitWebApi.Models.Sales;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GranitWebApi.Models.Proforma
@@ -45,6 +46,19 @@ namespace GranitWebApi.Models.Proforma
         public decimal? AdvancePercentage { get; set; }
         public int? PaymentTermDays { get; set; }
 
+        [MaxLength(40)]
+        public string? PaymentCondition { get; set; }
+
+        // Bakiye ödeme koşulu (ön ödemeli işlemler)
+        [MaxLength(40)]
+        public string? BalancePaymentCondition { get; set; }
+
+        // Vade başlangıç tarihi türü
+        [MaxLength(30)]
+        public string? PaymentTermBasis { get; set; }
+        [MaxLength(500)]
+        public string? PaymentTermsText { get; set; }
+
         [MaxLength(1000)]
         public string? PaymentDescription { get; set; }
         public decimal TotalAmount { get; set; }
@@ -55,18 +69,21 @@ namespace GranitWebApi.Models.Proforma
         public bool Ordered { get; set; } = false;
         // Workflow
         public int? ProcessRequestId { get; set; }
-
-        // Açıklama
-        [MaxLength(1000)]
         public string? Description { get; set; }
         // Audit
         public DateTime CreatedAt { get; set; }
         public int CreatedBy { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public int? UpdatedBy { get; set; }
+        public int BankAccountId { get; set; }
+        public decimal AdditionalAmount { get; set; } = 0;
+        public decimal DeductionAmount { get; set; } = 0;
 
         // Satırlar
         public ICollection<SalesProformaLine> Lines { get; set; } = new List<SalesProformaLine>();
         public ICollection<SalesProformaPayment> Payments { get; set; } = new List<SalesProformaPayment>();
+
+        [NotMapped]
+        public SalesProformaDocumentInfo? Document { get; set; }
     }
 }

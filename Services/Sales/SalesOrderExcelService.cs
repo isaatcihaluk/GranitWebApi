@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Office2010.CustomUI;
 using GranitWebApi.Models.Sales;
 
 namespace GranitWebApi.Services.Sales
@@ -12,7 +13,7 @@ namespace GranitWebApi.Services.Sales
             _salesOrderFormService = salesOrderFormService;
         }
 
-        public async Task<byte[]> CreateSalesOrderExcelAsync(long salesOrderId)
+        public async Task<byte[]> CreateSalesOrderExcelAsync(long salesOrderId,string? revisionDescription = null)
         {
             var form = await _salesOrderFormService.GetOrderFormDataAsync(salesOrderId);
             if (form == null) throw new Exception("Sipariş bulunamadı.");
@@ -72,7 +73,7 @@ namespace GranitWebApi.Services.Sales
             AddInfoRow(ws,row++,"SİPARİŞ NO",form.SystemOrderNumber);
             AddInfoRow(ws,row++,"YÜKLEME ŞEKLİ",form.DeliveryMethod +" / " +form.Incoterm);
             AddInfoRow(ws,row++,"DEPO TESLİM TARİHİ",form.DueDate?.ToString("dd.MM.yyyy"));
-            AddInfoRow(ws,row++,"REVİZE KONUSU","");
+            AddInfoRow(ws,row++,"REVİZE KONUSU",revisionDescription ?? "");
             AddInfoRow(ws,row++,"MÜŞTERİ TEMSİLCİSİ",form.SalesRepresentativeName);
 
             row += 1;
@@ -91,6 +92,17 @@ namespace GranitWebApi.Services.Sales
             if (umPackages.Count > 0)
             {
                 row = AddUMSection(ws,row,umPackages);
+            }
+            var ykPackages = form.Packages
+    .Where(x =>
+        x.Lines != null &&
+        x.Lines.Any(l =>
+            l.ProductGroupId == "5"))
+    .ToList();
+
+            if (ykPackages.Count > 0)
+            {
+                row = AddYKSection(ws, row, ykPackages);
             }
 
             // GENEL AÇIKLAMA ALANI
@@ -430,259 +442,171 @@ namespace GranitWebApi.Services.Sales
             return row;
         }
 
-        // =============================================================
         // HEADER STYLE
-        // =============================================================
-
-        private static void StyleHeader(
-            IXLWorksheet ws,
-            int row,
-            int columnCount)
+        private static void StyleHeader(IXLWorksheet ws,int row,int columnCount)
         {
-            var headerRange =
-                ws.Range(
-                    row,
-                    1,
-                    row,
-                    columnCount
-                );
-
+            var headerRange = ws.Range(row,1,row,columnCount);
             headerRange.Style.Font.Bold = true;
-
             headerRange.Style.Font.FontSize = 8;
-
-            headerRange.Style.Font.FontColor =
-                XLColor.White;
-
-            headerRange.Style.Fill.BackgroundColor =
-                XLColor.FromHtml("#3668E8");
-
-            headerRange.Style.Alignment.Horizontal =
-                XLAlignmentHorizontalValues.Center;
-
-            headerRange.Style.Alignment.Vertical =
-                XLAlignmentVerticalValues.Center;
-
-            headerRange.Style.Alignment.WrapText =
-                true;
-
-            headerRange.Style.Border.OutsideBorder =
-                XLBorderStyleValues.Thin;
-
-            headerRange.Style.Border.InsideBorder =
-                XLBorderStyleValues.Thin;
-
+            headerRange.Style.Font.FontColor = XLColor.White;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#3668E8");
+            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            headerRange.Style.Alignment.WrapText = true;
+            headerRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            headerRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             ws.Row(row).Height = 30;
         }
 
-        // =============================================================
         // ÜST BİLGİ SATIRI
-        // =============================================================
-
-        private static void AddInfoRow(
-            IXLWorksheet ws,
-            int row,
-            string label,
-            string? value)
+        private static void AddInfoRow(IXLWorksheet ws,int row,string label,string? value)
         {
             // A:C = başlık
-            ws.Range(
-                row,
-                1,
-                row,
-                3
-            ).Merge();
-
-            var labelCell =
-                ws.Cell(row, 1);
-
-            labelCell.Value =
-                label;
-
-            labelCell.Style.Font.Bold =
-                true;
-
-            labelCell.Style.Font.FontSize =
-                8;
-
-            labelCell.Style.Font.FontColor =
-                XLColor.FromHtml("#0000CC");
-
-            labelCell.Style.Alignment.Horizontal =
-                XLAlignmentHorizontalValues.Left;
-
-            labelCell.Style.Alignment.Vertical =
-                XLAlignmentVerticalValues.Center;
+            ws.Range(row,1,row,3).Merge();
+            var labelCell = ws.Cell(row, 1);
+            labelCell.Value = label;
+            labelCell.Style.Font.Bold = true;
+            labelCell.Style.Font.FontSize = 8;
+            labelCell.Style.Font.FontColor = XLColor.FromHtml("#0000CC");
+            labelCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            labelCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
 
             // D:Q = değer
-            ws.Range(
-                row,
-                4,
-                row,
-                17
-            ).Merge();
-
-            var valueCell =
-                ws.Cell(row, 4);
-
-            valueCell.Value =
-                value ?? "";
-
-            valueCell.Style.Font.FontSize =
-                9;
-
-            valueCell.Style.Alignment.Horizontal =
-                XLAlignmentHorizontalValues.Left;
-
-            valueCell.Style.Alignment.Vertical =
-                XLAlignmentVerticalValues.Center;
-
+            ws.Range(row,4,row,17).Merge();
+            var valueCell = ws.Cell(row, 4);
+            valueCell.Value = value ?? "";
+            valueCell.Style.Font.FontSize = 9;
+            valueCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            valueCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             // Kenarlık
-            var range =
-                ws.Range(
-                    row,
-                    1,
-                    row,
-                    17
-                );
-
-            range.Style.Border.OutsideBorder =
-                XLBorderStyleValues.Thin;
-
-            range.Style.Border.InsideBorder =
-                XLBorderStyleValues.Thin;
-
+            var range = ws.Range(row,1,row,17);
+            range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             ws.Row(row).Height = 20;
         }
 
-        // =============================================================
         // PLASTİK
-        // =============================================================
-
-        private static string BuildPlasticText(
-            string? renk1,
-            string? renk2)
+        private static string BuildPlasticText(string? renk1,string? renk2)
         {
-            var values =
-                new List<string>();
+            var values = new List<string>();
 
             if (!string.IsNullOrWhiteSpace(renk1))
             {
-                values.Add(
-                    renk1.Trim()
-                );
+                values.Add(renk1.Trim());
             }
-
-            if (!string.IsNullOrWhiteSpace(renk2) &&
-                !string.Equals(
-                    renk2.Trim(),
-                    renk1?.Trim(),
-                    StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(renk2) && !string.Equals(renk2.Trim(),renk1?.Trim(),StringComparison.OrdinalIgnoreCase))
             {
-                values.Add(
-                    renk2.Trim()
-                );
+                values.Add(renk2.Trim());
             }
 
-            return string.Join(
-                " / ",
-                values
-            );
-        }
+            return string.Join(" / ",values);
+        }       
 
-        // =============================================================
-        // SHRINK
-        // =============================================================
-
-        private static string BuildShrinkText(
-            string? kod,
-            string? ad)
-        {
-            bool hasKod =
-                !string.IsNullOrWhiteSpace(kod);
-
-            bool hasAd =
-                !string.IsNullOrWhiteSpace(ad);
-
-            if (hasKod && hasAd)
-            {
-                return
-                    $"{kod!.Trim()}\n{ad!.Trim()}";
-            }
-
-            if (hasKod)
-                return kod!.Trim();
-
-            if (hasAd)
-                return ad!.Trim();
-
-            return "";
-        }
-
-        // =============================================================
         // CK BROŞÜR
-        // =============================================================
-
-        private static string BuildBrochureText(
-            SalesOrderFormCKDetails ck)
+        private static string BuildBrochureText(SalesOrderFormCKDetails ck)
         {
-            if (ck.BrosurImages == null ||
-                ck.BrosurImages.Count == 0)
+            if (ck.BrosurImages == null || ck.BrosurImages.Count == 0)
             {
                 return "";
             }
 
-            var names =
-                ck.BrosurImages
-                    .Select(x =>
-                        !string.IsNullOrWhiteSpace(
-                            x.ImageTypeName)
-                            ? x.ImageTypeName
-                            : x.FileName)
-                    .Where(x =>
-                        !string.IsNullOrWhiteSpace(x))
-                    .Select(x =>
-                        x!.Trim())
-                    .Distinct()
-                    .ToList();
+            var names = ck.BrosurImages.Select(x => !string.IsNullOrWhiteSpace(x.ImageTypeName) ? x.ImageTypeName : x.FileName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim())
+                    .Distinct().ToList();
 
-            return string.Join(
-                "\n",
-                names
-            );
+            return string.Join("\n",names);
         }
 
-        // =============================================================
         // UM BROŞÜR
-        // =============================================================
-
-        private static string BuildBrochureText(
-            List<SalesOrderFormImage>? images)
+        private static string BuildBrochureText(List<SalesOrderFormImage>? images)
         {
-            if (images == null ||
-                images.Count == 0)
+            if (images == null || images.Count == 0)
             {
                 return "";
             }
 
-            var names =
-                images
-                    .Select(x =>
-                        !string.IsNullOrWhiteSpace(
-                            x.ImageTypeName)
-                            ? x.ImageTypeName
-                            : x.FileName)
-                    .Where(x =>
-                        !string.IsNullOrWhiteSpace(x))
-                    .Select(x =>
-                        x!.Trim())
-                    .Distinct()
-                    .ToList();
+            var names =images.Select(x => !string.IsNullOrWhiteSpace(x.ImageTypeName)? x.ImageTypeName : x.FileName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim())
+                    .Distinct().ToList();
 
-            return string.Join(
-                "\n",
-                names
-            );
+            return string.Join("\n",names);
+        }
+
+        private int AddYKSection(IXLWorksheet ws,int row,List<SalesOrderFormPackage> packages)
+        {
+            ws.Range(row, 1, row, 15).Merge();
+            var titleCell = ws.Cell(row, 1);
+            titleCell.Value = "YEDEK KILIF";
+            titleCell.Style.Font.Bold = true;
+            titleCell.Style.Font.FontSize = 10;
+            titleCell.Style.Font.FontColor = XLColor.White;
+            titleCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#3668E8");
+            titleCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            titleCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            titleCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            ws.Row(row).Height = 25;
+            row++;
+
+            // BAŞLIKLAR
+            var headers = new[]
+            {
+                "SIRA",
+                "KOD",
+                "URUN ADI",
+                "MIKTAR",
+                "AÇIKLAMALAR"
+            };
+
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var cell = ws.Cell(row, i + 1);
+                cell.Value = headers[i];
+                StyleHeader(ws, row, i + 1);
+            }
+
+            row++;
+
+            // YK SATIRLARI
+            int startDataRow = row;
+            int sıra = 1;
+
+            foreach (var package in packages.OrderBy(x => x.PackageNumber))
+            {
+                var ykLines = package.Lines.Where(x => x.ProductGroupId == "5").ToList();
+
+                foreach (var line in ykLines)
+                {
+                    ws.Cell(row, 1).Value = sıra++;
+                    ws.Cell(row, 2).Value = package.NetsisPaketKodu ?? "";
+                    ws.Cell(row, 3).Value = package.NetsisPaketAdi ?? "";
+                    ws.Cell(row, 4).Value = package.KoliAdedi;
+                    ws.Cell(row, 5).Value = package.Definition ?? "";
+                    for (int column = 1; column <= 5; column++)
+                    {
+                        ws.Cell(row, column).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                    }
+                    ws.Row(row).Height = 75;
+                    row++;
+                }
+            }
+
+            // TOPLAM
+
+            ws.Cell(row, 1).Value = "TOPLAM SİPARİŞ";
+            ws.Range(row, 1, row, 3).Merge();
+
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 1).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+            ws.Cell(row, 4).FormulaA1 = $"SUM(D{startDataRow}:D{row - 1})";
+
+            ws.Cell(row, 4).Style.Font.Bold = true;
+            ws.Cell(row, 4).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+            ws.Range(row, 5, row, 5).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            row++;
+
+            return row + 1;
         }
     }
 }

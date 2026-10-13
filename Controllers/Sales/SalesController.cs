@@ -1,6 +1,7 @@
 ﻿using GranitWebApi.Data;
 using GranitWebApi.Helpers;
 using GranitWebApi.Models.Sales;
+using GranitWebApi.Services.Email.Sales;
 using GranitWebApi.Services.Sales;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -309,6 +310,28 @@ namespace GranitWebApi.Controllers.Sales
                     message = ex.Message
                 });
             }
+        }
+
+        [HttpPost("{id}/revision-mail")]
+        public async Task<IActionResult> SendRevisionMail(long id,[FromBody] SalesOrderRevisionMailRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.RevisionDescription))
+            {
+                return BadRequest(new
+                {
+                    message = "Revize konusu boş bırakılamaz."
+                });
+            }
+
+            var result = await _salesOrderService.SendRevisionMailAsync(id,request.RevisionDescription.Trim());
+            if (!result.Basarili)
+            {
+                return BadRequest(new
+                {
+                    message = result.Aciklama
+                });
+            }
+            return Ok(result);
         }
     }
 }

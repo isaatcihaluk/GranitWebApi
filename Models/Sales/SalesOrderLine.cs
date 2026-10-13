@@ -30,6 +30,14 @@ namespace GranitWebApi.Models.Sales
         public string? ShrinkliKod { get; set; }
         public string? ShrinkliAd { get; set; }
         public string? YKFabricCode { get; set; }
+        public string? BUColorRal { get; set; }
+        public string? BUColorDescription { get; set; }
+        public string? BUPlasticRal { get; set; }
+        public string? BUPlasticColor { get; set; }
+        public string? BUEtiketAkmazCode { get; set; }
+        public string? BUEtiketAkmazName { get; set; }
+        public string? BUFabricsCode { get; set; }
+        public string? BUFabricsName { get; set; }
         [JsonIgnore]
         [ForeignKey(nameof(SalesOrderId))]
         public GranitWebApi.Models.Sales.SalesOrder? SalesOrder { get; set; }
@@ -40,7 +48,6 @@ namespace GranitWebApi.Models.Sales
         [JsonIgnore]
         public ICollection<SalesOrderPackageLine> PackageLines { get; set; } = new List<SalesOrderPackageLine>();
     }
-
     public class SalesOrderLineEditResult
     {
         public long LineId { get; set; }
@@ -84,6 +91,15 @@ namespace GranitWebApi.Models.Sales
         public string? PlasticCombinationNo { get; set; }
         public string? PlasticCombinationDescription { get; set; }
         public string? YKFabricCode { get; set; }
+
+        public string? BUColorRal { get; set; }
+        public string? BUColorDescription { get; set; }
+        public string? BUPlasticRal { get; set; }
+        public string? BUPlasticColor { get; set; }
+        public string? BUEtiketAkmazCode { get; set; }
+        public string? BUEtiketAkmazName { get; set; }
+        public string? BUFabricCode { get; set; }
+        public string? BUFabricName { get; set; }
     }
     public class SalesOrderLineEditImage
     {
