@@ -1,9 +1,9 @@
 ﻿using DocumentFormat.OpenXml.InkML;
 using GranitWebApi.Data;
 using GranitWebApi.Helpers;
-using GranitWebApi.Models;
 using GranitWebApi.Models.NETSISMODELLER;
 using GranitWebApi.Models.Proforma;
+using GranitWebApi.Services.Notification;
 using GranitWebApi.Services.Proforma;
 using GranitWebApi.Workflow.Enums;
 using GranitWebApi.Workflow.Interfaces;
@@ -28,9 +28,11 @@ namespace GranitWebApi.Controllers.Proforma
         private readonly ErpDbContext _erpContext;
         private readonly AppDbContext _context;
         private readonly ISalesProformaPdfService _proformaPdfService;
+        private readonly SalesProformaNotificationService _proformaNotificationService;
 
         public SalesProformaController(ISalesProformaService proformaService, UserContext userContext,
-            IWorkflowService workflowService, ErpDbContext erpContext, AppDbContext context, ISalesProformaPdfService proformaPdfService)
+            IWorkflowService workflowService, ErpDbContext erpContext, AppDbContext context,
+            ISalesProformaPdfService proformaPdfService, SalesProformaNotificationService proformaNotificationService)
         {
             _proformaService = proformaService;
             _userContext = userContext;
@@ -38,6 +40,7 @@ namespace GranitWebApi.Controllers.Proforma
             _erpContext = erpContext;
             _context = context;
             _proformaPdfService = proformaPdfService;
+            _proformaNotificationService = proformaNotificationService;
         }
 
         #region Get List
@@ -170,7 +173,7 @@ namespace GranitWebApi.Controllers.Proforma
                 {
                     ProcessTypeId = processTypeId,
                     CreatedBy = _userContext.UserId,
-                    Title = $"Satış Proforması - {proforma.ProformaNumber}",
+                    Title = $"Satış Proforması - {proforma.SystemProformaNumber}",
                     EntityId = proforma.Id,
                     Status = WorkflowStatus.Taslak.ToString(),
                     IsVisibleToHR = false,
@@ -178,7 +181,6 @@ namespace GranitWebApi.Controllers.Proforma
                 };
 
                 var requestId = await _workflowService.StartAndSubmitAsync(request, comment ?? "Proforma onaya gönderildi.");
-
                 var saved = await _proformaService.SetWorkflowAsync(id, requestId, "ONAY_BEKLIYOR", _userContext.UserId);
                 if (!saved)
                 {
@@ -190,6 +192,16 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
+                // Proforma kaydı başarıyla güncellendikten sonra bildirim gönder.
+                try
+                {
+                    await _proformaNotificationService.SendApprovalPendingAsync(requestId);
+                }
+                catch (Exception mailEx)
+                {
+                    // E-posta hatası, başarılı workflow gönderimini başarısız yapmasın.
+                    Console.WriteLine($"Proforma onay bekleme e-postası gönderilemedi: {mailEx.Message}");
+                }
                 return Ok(new
                 {
                     basarili = true,
@@ -210,12 +222,14 @@ namespace GranitWebApi.Controllers.Proforma
         #endregion
 
         #region Workflow - Return
+
         [HttpPost("workflow/{id:int}/return")]
         public async Task<IActionResult> Return(int id, [FromBody] string? comment)
         {
             try
             {
                 var proforma = await _proformaService.GetByIdAsync(id);
+
                 if (proforma == null)
                 {
                     return NotFound(new
@@ -223,8 +237,10 @@ namespace GranitWebApi.Controllers.Proforma
                         message = "Proforma bulunamadı."
                     });
                 }
+
                 if (proforma.ProcessRequestId == null ||
-                    !new[] { "ONAY_BEKLIYOR", "FINANS_ONAY_BEKLIYOR", "ON_ODEME_BEKLIYOR" }.Contains(proforma.Status))
+                    !new[] { "ONAY_BEKLIYOR", "FINANS_ONAY_BEKLIYOR", "ON_ODEME_BEKLIYOR" }
+                        .Contains(proforma.Status))
                 {
                     return BadRequest(new
                     {
@@ -232,14 +248,35 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                await _workflowService.ReturnAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment);
+                var requestId = proforma.ProcessRequestId.Value;
+
+                // Önce workflow iade işlemi tamamlanır.
+                await _workflowService.ReturnAsync(
+                    requestId,
+                    _userContext.UserId,
+                    comment);
+
+                // İade başarılıysa talep sahibine revize e-postası gönderilir.
+                try
+                {
+                    await _proformaNotificationService.SendRevisionRequestedAsync(
+                        requestId,
+                        comment);
+                }
+                catch (Exception mailEx)
+                {
+                    // E-posta hatası başarılı workflow iadesini geri almamalı.
+                    Console.WriteLine(
+                        $"Proforma revize e-postası gönderilemedi. " +
+                        $"RequestId: {requestId}, Hata: {mailEx.Message}");
+                }
 
                 return Ok(new
                 {
                     basarili = true,
                     message = "Proforma revize için iade edildi.",
                     proformaId = id,
-                    processRequestId = proforma.ProcessRequestId
+                    processRequestId = requestId
                 });
             }
             catch (Exception ex)
@@ -255,8 +292,11 @@ namespace GranitWebApi.Controllers.Proforma
         #endregion
 
         #region Workflow - Resubmit
+
         [HttpPost("workflow/{id:int}/resubmit")]
-        public async Task<IActionResult> Resubmit(int id, [FromBody] string? comment)
+        public async Task<IActionResult> Resubmit(
+            int id,
+            [FromBody] string? comment)
         {
             try
             {
@@ -269,21 +309,25 @@ namespace GranitWebApi.Controllers.Proforma
                         message = "Proforma bulunamadı."
                     });
                 }
-                if (proforma.Status != "REVIZE" && proforma.Status != "ON_ODEME_BEKLIYOR")
+
+                if (proforma.Status != "REVIZE" &&
+                    proforma.Status != "ON_ODEME_BEKLIYOR")
                 {
                     return BadRequest(new
                     {
                         message = "Bu durumdaki proforma tekrar gönderilemez."
                     });
                 }
+
                 if (proforma.ProcessRequestId == null)
                 {
                     return BadRequest(new
                     {
                         message = "Proformaya ait mevcut workflow süreci bulunamadı. " +
-                            "İlk gönderim işlemini kontrol edin."
+                                  "İlk gönderim işlemini kontrol edin."
                     });
                 }
+
                 if (!proforma.Lines.Any(x => !x.DeletedFlag))
                 {
                     return BadRequest(new
@@ -292,17 +336,66 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                var parameters = JsonSerializer.Serialize(new { PaymentType = proforma.PaymentType, PaymentCondition = proforma.PaymentCondition });
+                var requestId = proforma.ProcessRequestId.Value;
 
-                await _workflowService.ResubmitAsync(proforma.ProcessRequestId.Value, _userContext.UserId,
-                    comment ?? "Revize sonrası tekrar onaya gönderildi.", parameters);
+                // Revize edilen workflow adımını tekrar gönderimden önce al.
+                var workflowRequest = await _context.ProcessRequest
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == requestId);
+
+                if (workflowRequest == null)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Workflow kaydı bulunamadı."
+                    });
+                }
+
+                var revisionStep = workflowRequest.CurrentStep;
+
+                var parameters = JsonSerializer.Serialize(new
+                {
+                    PaymentType = proforma.PaymentType,
+                    PaymentCondition = proforma.PaymentCondition
+                });
+
+                // Workflow tekrar gönderilir.
+                await _workflowService.ResubmitAsync(
+                    requestId,
+                    _userContext.UserId,
+                    comment ?? "Revize sonrası tekrar onaya gönderildi.",
+                    parameters);
+
+                // E-posta hatası workflow işlemini başarısız yapmamalı.
+                try
+                {
+                    if (revisionStep == 1)
+                    {
+                        // İlk onay adımı revize edildiyse aktif onaycılara bildir.
+                        await _proformaNotificationService.SendApprovalPendingAsync(requestId);
+                    }
+
+                    // revisionStep == 2 ise finans revizesidir.
+                    // Workflow bekletilir; finans bildirimi ödeme bilgileri
+                    // SubmitPaymentForFinance ile gönderildiğinde yapılacaktır.
+                }
+                catch (Exception mailEx)
+                {
+                    Console.WriteLine(
+                        $"Proforma tekrar gönderim e-postası gönderilemedi. " +
+                        $"ProformaId: {id}, RequestId: {requestId}, " +
+                        $"Hata: {mailEx.Message}");
+                }
+
+                var updatedProforma = await _proformaService.GetByIdAsync(id);
 
                 return Ok(new
                 {
                     basarili = true,
                     message = "Revize proforma tekrar gönderildi.",
                     proformaId = id,
-                    processRequestId = proforma.ProcessRequestId
+                    processRequestId = requestId,
+                    durum = updatedProforma?.Status
                 });
             }
             catch (Exception ex)
@@ -314,15 +407,18 @@ namespace GranitWebApi.Controllers.Proforma
                 });
             }
         }
+
         #endregion
 
         #region Workflow - Cancel
+
         [HttpPost("workflow/{id:int}/cancel")]
         public async Task<IActionResult> Cancel(int id, [FromBody] string? comment)
         {
             try
             {
                 var proforma = await _proformaService.GetByIdAsync(id);
+
                 if (proforma == null)
                 {
                     return NotFound(new
@@ -331,7 +427,14 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                var allowedStatuses = new[] { "TASLAK", "ONAY_BEKLIYOR", "REVIZE", "ON_ODEME_BEKLIYOR" };
+                var allowedStatuses = new[]
+                {
+            "TASLAK",
+            "ONAY_BEKLIYOR",
+            "REVIZE",
+            "ON_ODEME_BEKLIYOR"
+        };
+
                 if (!allowedStatuses.Contains(proforma.Status))
                 {
                     return BadRequest(new
@@ -340,12 +443,20 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                if (proforma.ProcessRequestId.HasValue)
+                var requestId = proforma.ProcessRequestId;
+
+                if (requestId.HasValue)
                 {
-                    await _workflowService.CancelAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment ?? "Proforma iptal edildi.");
+                    await _workflowService.CancelAsync(
+                        requestId.Value,
+                        _userContext.UserId,
+                        comment ?? "Proforma iptal edildi.");
                 }
 
-                var saved = await _proformaService.UpdateStatusAsync(id, "IPTAL", _userContext.UserId);
+                var saved = await _proformaService.UpdateStatusAsync(
+                    id,
+                    "IPTAL",
+                    _userContext.UserId);
 
                 if (!saved)
                 {
@@ -356,12 +467,29 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
+                // İptal ve durum güncellemesi başarılıysa e-posta gönder.
+                if (requestId.HasValue)
+                {
+                    try
+                    {
+                        await _proformaNotificationService.SendCancelledAsync(
+                            requestId.Value,
+                            comment);
+                    }
+                    catch (Exception mailEx)
+                    {
+                        Console.WriteLine(
+                            $"Proforma iptal e-postası gönderilemedi. " +
+                            $"RequestId: {requestId.Value}, Hata: {mailEx.Message}");
+                    }
+                }
+
                 return Ok(new
                 {
                     basarili = true,
                     message = "Proforma iptal edildi.",
                     proformaId = id,
-                    processRequestId = proforma.ProcessRequestId
+                    processRequestId = requestId
                 });
             }
             catch (Exception ex)
@@ -373,6 +501,7 @@ namespace GranitWebApi.Controllers.Proforma
                 });
             }
         }
+
         #endregion
 
         #region Workflow - Approve
@@ -389,6 +518,7 @@ namespace GranitWebApi.Controllers.Proforma
                         message = "Proforma bulunamadı."
                     });
                 }
+
                 if (proforma.ProcessRequestId == null)
                 {
                     return BadRequest(new
@@ -397,14 +527,41 @@ namespace GranitWebApi.Controllers.Proforma
                     });
                 }
 
-                await _workflowService.ApproveAsync(proforma.ProcessRequestId.Value, _userContext.UserId, comment);
+                var requestId = proforma.ProcessRequestId.Value;
+                await _workflowService.ApproveAsync(requestId, _userContext.UserId, comment);
+                var updatedProforma = await _proformaService.GetByIdAsync(id);
+                if (updatedProforma?.Status == "TAMAMLANDI")
+                {
+                    try
+                    {
+                        await _proformaNotificationService.SendApprovedAsync(requestId);
+                    }
+                    catch (Exception mailEx)
+                    {
+                        Console.WriteLine($"Proforma onay e-postası gönderilemedi. " +
+                            $"RequestId: {requestId}, Hata: {mailEx.Message}");
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        await _proformaNotificationService.SendApprovalPendingAsync(requestId);
+                    }
+                    catch (Exception mailEx)
+                    {
+                        Console.WriteLine($"Sonraki onay adımı e-postası gönderilemedi. " +
+                            $"RequestId: {requestId}, Hata: {mailEx.Message}");
+                    }
+                }
 
                 return Ok(new
                 {
                     basarili = true,
                     message = "Proforma onay işlemi gerçekleştirildi.",
                     proformaId = id,
-                    processRequestId = proforma.ProcessRequestId
+                    processRequestId = requestId,
+                    durum = updatedProforma?.Status
                 });
             }
             catch (Exception ex)
@@ -490,7 +647,7 @@ namespace GranitWebApi.Controllers.Proforma
 
                 await _proformaService.SubmitPaymentForFinanceAsync(id, userId);
                 await _workflowService.ActivateStepAsync(proforma.ProcessRequestId.Value, 2, userId, "Ödeme bilgileri girildi, finans onayına gönderildi.");
-
+                await _proformaNotificationService.SendApprovalPendingAsync(proforma.ProcessRequestId.Value,template: "FinanceApprovalPending");
                 return Ok(new
                 {
                     message = "Ödeme bilgileri finans onayına gönderildi.",

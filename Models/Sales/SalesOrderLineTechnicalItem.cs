@@ -23,4 +23,11 @@ namespace GranitWebApi.Models.Sales
         [ForeignKey(nameof(ImageId))]
         public SalesOrderLineImage? Image { get; set; }
     }
+
+    public class TechnicalStockInfo
+    {
+        public string STOK_KODU { get; set; } = string.Empty;
+        public string STOK_ADI { get; set; } = string.Empty;
+        public string GRUP { get; set; } = string.Empty;
+    }
 }

@@ -110,37 +110,43 @@ namespace GranitWebApi.Services.Sales
             return true;
         }
 
-        public async Task<List<TBLSTSABIT>> GetStockInfoAsync()
+        public async Task<List<TechnicalStockInfo>> GetStockInfoAsync()
         {
             return await _erpContext.TBLSTSABIT.AsNoTracking()
-            .Where(x => x.STOK_KODU.StartsWith("3202") || x.STOK_KODU.StartsWith("3203") || x.STOK_KODU.StartsWith("3204"))
-            .OrderBy(x => x.STOK_KODU).ToListAsync();
+                .Where(x =>
+                    x.STOK_KODU.StartsWith("3202") || x.STOK_KODU.StartsWith("3203") ||
+                    x.STOK_KODU.StartsWith("3204") || x.STOK_KODU.StartsWith("3205"))
+                .OrderBy(x => x.STOK_KODU).Select(x => new TechnicalStockInfo {
+                    STOK_KODU = x.STOK_KODU,
+                    STOK_ADI = x.STOK_ADI,
+
+                    GRUP = x.STOK_KODU.StartsWith("3202") ? "BROSUR"
+                        : x.STOK_KODU.StartsWith("3203.01") || x.STOK_KODU.StartsWith("3203.00") ? "KOLI UZERI"
+                        : x.STOK_KODU.StartsWith("3203.02") ? "SHRINK USTU"
+                        : x.STOK_KODU.StartsWith("3203.03") ? "RATING LABEL"
+                        : x.STOK_KODU.StartsWith("3204") ? "KULLANMA KILAVUZU"
+                        : x.STOK_KODU.StartsWith("3205") ? "YIKAMA TALIMATI"
+                        : "BU"
+                })
+                .ToListAsync();
         }
 
-        public async Task SaveTechnicalItemsAsync(
-    long salesOrderLineId,
-    List<SalesOrderLineTechnicalItem> technicalItems)
+        public async Task SaveTechnicalItemsAsync(long salesOrderLineId,List<SalesOrderLineTechnicalItem> technicalItems)
         {
-            var lineExists = await _context.SalesOrderLines
-                .AnyAsync(x => x.Id == salesOrderLineId);
-
+            var lineExists = await _context.SalesOrderLines.AnyAsync(x => x.Id == salesOrderLineId);
             if (!lineExists)
             {
                 throw new Exception("Sipariş satırı bulunamadı.");
             }
 
             var userId = _userContext.UserId;
-
-            var line = await _context.SalesOrderLines
-                .FirstOrDefaultAsync(x => x.Id == salesOrderLineId);
-
+            var line = await _context.SalesOrderLines.FirstOrDefaultAsync(x => x.Id == salesOrderLineId);
             if (line == null)
             {
                 throw new Exception("Sipariş satırı bulunamadı.");
             }
 
             var isYK = line.ProductGroupId == "5";
-
             foreach (var technicalItem in technicalItems)
             {
                 if (technicalItem.ImageId <= 0)
@@ -152,32 +158,23 @@ namespace GranitWebApi.Services.Sales
                 // stok seçilmiş olması gerekiyor.
                 if (string.IsNullOrWhiteSpace(technicalItem.StockCode))
                 {
-                    throw new Exception(
-                        $"ImageId={technicalItem.ImageId} için stok kodu seçilmemiş.");
+                    throw new Exception($"ImageId={technicalItem.ImageId} için stok kodu seçilmemiş.");
                 }
 
-                var image = await _context.SalesOrderLineImages
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == technicalItem.ImageId &&
-                        x.IsActive);
-
+                var image = await _context.SalesOrderLineImages.FirstOrDefaultAsync(x =>
+                        x.Id == technicalItem.ImageId && x.IsActive);
                 if (image == null)
                 {
-                    throw new Exception(
-                        $"ImageId={technicalItem.ImageId} olan görsel bulunamadı veya aktif değil.");
+                    throw new Exception($"ImageId={technicalItem.ImageId} olan görsel bulunamadı veya aktif değil.");
                 }
-
                 if (image.SalesOrderLineId != salesOrderLineId)
                 {
-                    throw new Exception(
-                        "Seçilen görsel ilgili sipariş satırına ait değil.");
+                    throw new Exception("Seçilen görsel ilgili sipariş satırına ait değil.");
                 }
 
                 var existing = await _context.SalesOrderLineTechnicalItems
-                    .FirstOrDefaultAsync(x =>
-                        x.SalesOrderLineId == salesOrderLineId &&
-                        x.ImageId == technicalItem.ImageId &&
-                        x.IsActive);
+                    .FirstOrDefaultAsync(x => x.SalesOrderLineId == salesOrderLineId &&
+                        x.ImageId == technicalItem.ImageId && x.IsActive);
 
                 if (existing == null)
                 {
@@ -213,7 +210,6 @@ namespace GranitWebApi.Services.Sales
                 await GenerateShrinkliKodAsync(salesOrderLineId);
                 await GenerateShrinkliAdAsync(salesOrderLineId);
             }
-
             await _context.SaveChangesAsync();
         }
         private async Task GenerateShrinkliKodAsync(long salesOrderLineId)

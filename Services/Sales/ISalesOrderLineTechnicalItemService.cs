@@ -11,7 +11,7 @@ namespace GranitWebApi.Services.Sales
         Task<SalesOrderLineTechnicalItem> CreateAsync(SalesOrderLineTechnicalItem technicalItem);
         Task<SalesOrderLineTechnicalItem?> UpdateAsync(long id, SalesOrderLineTechnicalItem technicalItem);
         Task<bool> DeleteAsync(long id);
-        Task<List<TBLSTSABIT>> GetStockInfoAsync();
+        Task<List<TechnicalStockInfo>> GetStockInfoAsync();
         Task SaveTechnicalItemsAsync(long salesOrderLineId,List<SalesOrderLineTechnicalItem> technicalItems);
     }
 }

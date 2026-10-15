@@ -1042,7 +1042,6 @@ namespace GranitWebApi.Services.Sales
         public async Task<SalesOrderMailResult> SendRevisionMailAsync(long salesOrderId,string revisionDescription)
         {
             var salesOrder = await _context.SalesOrders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == salesOrderId);
-
             if (salesOrder == null)
             {
                 return new SalesOrderMailResult
@@ -1053,7 +1052,6 @@ namespace GranitWebApi.Services.Sales
                     Aciklama = $"Satış siparişi bulunamadı. Id: {salesOrderId}"
                 };
             }
-
             if (salesOrder.Status != "TAMAMLANDI")
             {
                 return new SalesOrderMailResult
@@ -1064,7 +1062,6 @@ namespace GranitWebApi.Services.Sales
                     Aciklama = "Revize maili yalnızca TAMAMLANDI durumundaki siparişler için gönderilebilir."
                 };
             }
-
             if (string.IsNullOrWhiteSpace(revisionDescription))
             {
                 return new SalesOrderMailResult
@@ -1079,7 +1076,6 @@ namespace GranitWebApi.Services.Sales
             try
             {
                 var mailResult = await _salesOrderMailService.SendRevisionMailAsync(salesOrderId,revisionDescription.Trim());
-
                 return mailResult;
             }
             catch (Exception ex)

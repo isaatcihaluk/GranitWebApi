@@ -29,14 +29,6 @@ namespace GranitWebApi.Services.Sales
             public decimal Quantity { get; set; }
         }
 
-        //private static void AddParameter(DbCommand command, string name, object? value)
-        //{
-        //    var parameter = command.CreateParameter();
-        //    parameter.ParameterName = name;
-        //    parameter.Value = value ?? DBNull.Value;
-        //    command.Parameters.Add(parameter);
-        //}
-
         public SalesOrderPackageService(AppDbContext context, ErpDbContext erpContext, UserContext userContext)
         {
             _context = context;
@@ -57,14 +49,14 @@ namespace GranitWebApi.Services.Sales
         // PAKET OLUŞTUR
         public async Task<SalesOrderPackage> CreatePackageAsync(SalesOrderPackageCreateRequest request)
         {
+            // SİPARİŞ KONTROLÜ
             var order = await _context.SalesOrders.FirstOrDefaultAsync(x => x.Id == request.SalesOrderId);
 
-            if (order == null) { throw new Exception("Sipariş bulunamadı."); }
-            if (order.Status != "PAKETLEME") { throw new Exception("Bu sipariş paketleme aşamasında değil."); }
-            if (string.IsNullOrWhiteSpace(request.Referans)) { throw new Exception("Paket referansı girilmelidir."); }
+            if (order == null) throw new Exception("Sipariş bulunamadı.");
+            if (order.Status != "PAKETLEME") throw new Exception("Bu sipariş paketleme aşamasında değil.");
+            if (request.Lines == null || request.Lines.Count == 0) throw new Exception("Pakete en az bir ürün eklenmelidir.");
 
-            var referans = request.Referans.Trim();
-            if (request.Lines == null || request.Lines.Count == 0) { throw new Exception("Pakete en az bir ürün eklenmelidir."); }
+            var referans = (request.Referans ?? string.Empty).Trim();
 
             // AYNI SİPARİŞ KALEMİ BİRDEN FAZLA EKLENEMEZ
             var duplicateLine = request.Lines.GroupBy(x => x.SalesOrderLineId).FirstOrDefault(x => x.Count() > 1);
@@ -73,31 +65,27 @@ namespace GranitWebApi.Services.Sales
                 throw new Exception($"Sipariş kalemi {duplicateLine.Key} pakete birden fazla eklenemez.");
             }
 
-            // KOLİ KONTROLÜ
-            var koli = await _context.ProductBoxes.FirstOrDefaultAsync(x => x.Id == request.KoliId);
-
-            if (koli == null) { throw new Exception("Seçilen koli bulunamadı."); }
-            if (!koli.KoliIciMiktar.HasValue || koli.KoliIciMiktar.Value <= 0)
+            // MİKTAR KONTROLÜ
+            foreach (var requestLine in request.Lines)
             {
-                throw new Exception("Seçilen kolinin iç miktarı geçersiz.");
-            }
-            if (string.IsNullOrWhiteSpace(koli.KoliKod))
-            {
-                throw new Exception("Seçilen kolinin koli kodu bulunamadı.");
+                if (requestLine.Quantity <= 0)
+                {
+                    throw new Exception(
+                        $"Sipariş kalemi {requestLine.SalesOrderLineId} için " +
+                        "miktar 0'dan büyük olmalıdır.");
+                }
             }
 
-            var koliIciMiktar = koli.KoliIciMiktar.Value;
-
-            // SİPARİŞ KALEMLERİ
+            // SİPARİŞ KALEMLERİNİ GETİR
             var lineIds = request.Lines.Select(x => x.SalesOrderLineId).ToList();
-            var orderLines = await _context.SalesOrderLines.Include(x => x.CKConfiguration).Include(x => x.UMConfiguration)
-                .Where(x => x.SalesOrderId == request.SalesOrderId && lineIds.Contains(x.Id) && !x.DeletedFlag).ToListAsync();
+
+            var orderLines = await _context.SalesOrderLines.Include(x => x.CKConfiguration)
+                .Include(x => x.UMConfiguration).Where(x => x.SalesOrderId == request.SalesOrderId &&
+                    lineIds.Contains(x.Id) && !x.DeletedFlag).ToListAsync();
 
             if (orderLines.Count != lineIds.Count)
             {
-                throw new Exception(
-                    "Pakete eklenen sipariş kalemlerinden biri " +
-                    "bu siparişe ait değil.");
+                throw new Exception("Pakete eklenen sipariş kalemlerinden biri bu siparişe ait değil.");
             }
 
             // AYNI PAKETTE FARKLI ÜRÜN GRUBU OLAMAZ
@@ -120,17 +108,72 @@ namespace GranitWebApi.Services.Sales
                 }
             }
 
-            // MİKTAR KONTROLÜ
-            foreach (var requestLine in request.Lines)
+            // KOLİ BİLGİLERİ
+            string koliKod;
+            int koliIciMiktar;
+            int? koliId;
+
+            // KoliId = 0, Sarmal seçildiğini ifade eder.
+            var isSarmal = request.KoliId == "0";
+
+            if (isSarmal)
             {
-                if (requestLine.Quantity <= 0)
+                // SARMAL: Sipariş kalemindeki koli bilgilerini kullan.
+                var sarmalLines = orderLines
+                    .Where(x => x.KoliId == 0 &&
+                        string.Equals(x.KoliKod?.Trim(),"3302.02.0000",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (sarmalLines.Count == 0)
                 {
-                    throw new Exception(
-                        $"Sipariş kalemi {requestLine.SalesOrderLineId} için " +
-                        "miktar 0'dan büyük olmalıdır.");
+                    throw new Exception("Seçilen sipariş kalemlerinde Sarmal koli tanımı bulunamadı.");
                 }
+
+                // Seçilen paket satırlarının Sarmal koli tanımıyla eşleşmesini kontrol et.
+                foreach (var requestLine in request.Lines)
+                {
+                    var orderLine = orderLines.First(x => x.Id == requestLine.SalesOrderLineId);
+
+                    var lineIsSarmal =orderLine.KoliId == 0 &&
+                        string.Equals(orderLine.KoliKod?.Trim(),"3302.02.0000",
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (!lineIsSarmal)
+                    {
+                        throw new Exception($"{orderLine.ProductName} satırı seçilen Sarmal koliyle eşleşmiyor.");
+                    }
+                }
+
+                // Sarmal kapasitesi, seçilen sipariş kalemlerinden alınır.
+                var capacities = sarmalLines.Select(x => x.KoliIciMiktar).Distinct().ToList();
+                if (capacities.Count != 1 || !capacities[0].HasValue || capacities[0].Value <= 0)
+                {
+                    throw new Exception("Sarmal koli iç miktarı geçersiz veya seçilen satırlarda tutarsız.");
+                }
+                koliId = 0;
+                koliKod = sarmalLines[0].KoliKod!.Trim();
+                koliIciMiktar = capacities[0]!.Value;
+            }
+            else
+            {
+                // NORMAL KOLİ: Mevcut ProductBoxes mantığını koru.
+                var koli = await _context.ProductBoxes.FirstOrDefaultAsync(x => x.Id == request.KoliId);
+                if (koli == null) throw new Exception("Seçilen koli bulunamadı.");
+                if (!koli.KoliIciMiktar.HasValue || koli.KoliIciMiktar.Value <= 0)
+                {
+                    throw new Exception("Seçilen kolinin iç miktarı geçersiz.");
+                }
+                if (string.IsNullOrWhiteSpace(koli.KoliKod))
+                {
+                    throw new Exception("Seçilen kolinin koli kodu bulunamadı.");
+                }
+                koliId = Convert.ToInt32(koli.Id);
+                koliKod = koli.KoliKod;
+                koliIciMiktar = koli.KoliIciMiktar.Value;
             }
 
+            // TOPLAM PAKET MİKTARI KONTROLÜ
             var totalPackageQuantity = request.Lines.Sum(x => x.Quantity);
             if (totalPackageQuantity != koliIciMiktar)
             {
@@ -140,7 +183,8 @@ namespace GranitWebApi.Services.Sales
             }
 
             // PAKET NUMARASI
-            var lastPackageNumber = await _context.SalesOrderPackages.Where(x => x.SalesOrderId == request.SalesOrderId)
+            var lastPackageNumber = await _context.SalesOrderPackages
+                .Where(x => x.SalesOrderId == request.SalesOrderId)
                 .Select(x => (int?)x.PackageNumber).MaxAsync() ?? 0;
 
             var newPackageNumber = lastPackageNumber + 1;
@@ -151,8 +195,8 @@ namespace GranitWebApi.Services.Sales
             {
                 SalesOrderId = request.SalesOrderId,
                 PackageNumber = newPackageNumber,
-                KoliId = koli.Id,
-                KoliKod = koli.KoliKod,
+                KoliId = koliId.ToString(),
+                KoliKod = koliKod,
                 KoliIciMiktar = koliIciMiktar,
                 Referans = referans,
                 Status = "TASLAK",
@@ -173,9 +217,11 @@ namespace GranitWebApi.Services.Sales
                     });
             }
 
-            var packageInfo = await GeneratePackageInfoAsync(package, orderLines);
+            // NETSİS PAKET BİLGİLERİ
+            var packageInfo = await GeneratePackageInfoAsync(package,orderLines);
             package.NetsisPaketKodu = packageInfo.Code;
             package.NetsisPaketAdi = packageInfo.Name;
+
             _context.SalesOrderPackages.Add(package);
             await _context.SaveChangesAsync();
             return package;
@@ -193,11 +239,6 @@ namespace GranitWebApi.Services.Sales
             {
                 throw new Exception("Bu sipariş paketleme aşamasında değil.");
             }
-            if (string.IsNullOrWhiteSpace(request.Referans))
-            {
-                throw new Exception("Paket referansı girilmelidir.");
-            }
-
             var referans = request.Referans.Trim();
 
             var package = await _context.SalesOrderPackages.Include(x => x.Lines)
@@ -404,11 +445,6 @@ namespace GranitWebApi.Services.Sales
                     "katalog kodu bulunamadı.");
             }
 
-            if (string.IsNullOrWhiteSpace(package.Referans))
-            {
-                throw new Exception("Paket referansı bulunamadı.");
-            }
-
             var referans = package.Referans.Trim();
             var distinctProducts = orderLines.Select(x => x.CKConfiguration!.ProductId).Distinct().ToList();
             if (distinctProducts.Count > 1)
@@ -561,9 +597,7 @@ namespace GranitWebApi.Services.Sales
             }
             else
             {
-                var netsisPackageCodes =
-                    await _erpContext.TBLSTOKURM
-                        .AsNoTracking()
+                var netsisPackageCodes = await _erpContext.TBLSTOKURM.AsNoTracking()
                         .Where(x => x.MAMUL_KODU != null && x.MAMUL_KODU.StartsWith(packageCodePrefix))
                         .Select(x => x.MAMUL_KODU!).Distinct().ToListAsync();
 
@@ -598,6 +632,53 @@ namespace GranitWebApi.Services.Sales
 
             // PAKET ADI
             string packageName;
+            // BROŞÜR BİLGİSİ
+            var brosurSuffix = "BROSURSUZ";
+
+            var lineIds = orderLines.Select(x => x.Id).Distinct().ToList();
+
+            var brosurImage = await _context.SalesOrderLineImages
+                .Where(x =>
+                    lineIds.Contains(x.SalesOrderLineId) &&
+                    x.ImageTypeId == 1 &&
+                    x.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (brosurImage != null)
+            {
+                var technicalItem = await _context.SalesOrderLineTechnicalItems
+                    .FirstOrDefaultAsync(x => x.SalesOrderLineId == brosurImage.SalesOrderLineId &&
+                        x.ImageId == brosurImage.Id && x.IsActive);
+
+                if (technicalItem != null && !string.IsNullOrWhiteSpace(technicalItem.StockCode))
+                {
+                    var lastThreeChars = technicalItem.StockCode.Length >= 3
+                        ? technicalItem.StockCode[^3..] : technicalItem.StockCode.PadLeft(3, '0');
+
+                    if (lastThreeChars == "000")
+                    {
+                        brosurSuffix = "BROSURSUZ";
+                    }
+                    else if (lastThreeChars == "999")
+                    {
+                        brosurSuffix = "GRANIT BROSUR";
+                    }
+                    else
+                    {
+                        if (string.IsNullOrWhiteSpace(technicalItem.StockName))
+                        {
+                            throw new Exception("Broşür stok adı bulunamadı.");
+                        }
+
+                        var match = Regex.Match(technicalItem.StockName, @"\(([^()]*)\)");
+                        if (!match.Success)
+                        {
+                            throw new Exception("Broşür stok adında parantez içerisinde referans/barkod bulunamadı.");
+                        }
+                        brosurSuffix = match.Groups[1].Value.Trim();
+                    }
+                }
+            }
             if (!isMixedPackage)
             {
                 packageName =
@@ -607,7 +688,7 @@ namespace GranitWebApi.Services.Sales
                     $"-PLASTIK " +
                     $"{plasticColorName1} " +
                     $"{package.KoliIciMiktar} LI " +
-                    $"{referans}";
+                    $"{brosurSuffix}";
             }
             else
             {
@@ -619,7 +700,7 @@ namespace GranitWebApi.Services.Sales
                     $"-PLSTK " +
                     $"{plasticText} " +
                     $"{package.KoliIciMiktar} LI " +
-                    $"{referans}";
+                    $"{brosurSuffix}";
             }
 
             packageName = packageName.ToUpper();
@@ -664,11 +745,6 @@ namespace GranitWebApi.Services.Sales
             if (string.IsNullOrWhiteSpace(firstLine.CatalogCode))
             {
                 throw new Exception($"{firstLine.ProductName} için katalog kodu bulunamadı.");
-            }
-
-            if (string.IsNullOrWhiteSpace(package.Referans))
-            {
-                throw new Exception("Paket referansı bulunamadı.");
             }
 
             var referans = package.Referans.Trim();
@@ -852,7 +928,55 @@ namespace GranitWebApi.Services.Sales
                 var counterText = newCounter.ToString("D4");
                 netsisPaketKodu = $"{packageCodePrefix}{counterText}";
             }
+            var brosurSuffix = "BROSURSUZ";
 
+            var lineIds = orderLines.Select(x => x.Id).Distinct().ToList();
+
+            var brosurImage = await _context.SalesOrderLineImages
+                .Where(x =>
+                    lineIds.Contains(x.SalesOrderLineId) &&
+                    x.ImageTypeId == 1 &&
+                    x.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (brosurImage != null)
+            {
+                var technicalItem = await _context.SalesOrderLineTechnicalItems
+                    .FirstOrDefaultAsync(x => x.SalesOrderLineId == brosurImage.SalesOrderLineId &&
+                        x.ImageId == brosurImage.Id && x.IsActive);
+
+                if (technicalItem != null &&
+                    !string.IsNullOrWhiteSpace(technicalItem.StockCode))
+                {
+                    var lastThreeChars = technicalItem.StockCode.Length >= 3
+                        ? technicalItem.StockCode[^3..] : technicalItem.StockCode.PadLeft(3, '0');
+
+                    if (lastThreeChars == "000")
+                    {
+                        brosurSuffix = "BROSURSUZ";
+                    }
+                    else if (lastThreeChars == "999")
+                    {
+                        brosurSuffix = "GRANIT BROSUR";
+                    }
+                    else
+                    {
+                        if (string.IsNullOrWhiteSpace(technicalItem.StockName))
+                        {
+                            throw new Exception("Broşür stok adı bulunamadı.");
+                        }
+
+                        var match = Regex.Match(technicalItem.StockName, @"\(([^()]*)\)");
+                        if (!match.Success)
+                        {
+                            throw new Exception(
+                                "Broşür stok adında parantez içerisinde referans/barkod bulunamadı.");
+                        }
+
+                        brosurSuffix = match.Groups[1].Value.Trim();
+                    }
+                }
+            }
             var packageName =
                 $"UM PKT " +
                 $"{firstLine.ProductName} " +
@@ -860,7 +984,7 @@ namespace GranitWebApi.Services.Sales
                 $"-PLSTK " +
                 $"{plasticCombinationDescription} " +
                 $"{package.KoliIciMiktar} LI " +
-                $"{referans}";
+                $"{brosurSuffix}";
 
             packageName = packageName.ToUpper();
             return new PackageInfo
@@ -952,23 +1076,19 @@ namespace GranitWebApi.Services.Sales
                 if (technicalItem != null && !string.IsNullOrWhiteSpace(technicalItem.StockName))
                 {
                     var match = Regex.Match(technicalItem.StockName, @"\(([^()]*)\)");
-
                     if (match.Success)
                     {
                         brosurSuffix = match.Groups[1].Value.Trim();
                     }
                     else
                     {
-                        throw new Exception(
-                            "YK paket adı oluşturulamadı. " +
+                        throw new Exception("YK paket adı oluşturulamadı. " +
                             "Broşür stok adında parantez içerisinde referans/barkod bulunamadı.");
                     }
                 }
                 else
                 {
-                    throw new Exception(
-                        "YK paket adı oluşturulamadı. " +
-                        "Broşür stok adı bulunamadı.");
+                    throw new Exception("YK paket adı oluşturulamadı. " + "Broşür stok adı bulunamadı.");
                 }
             }
 

@@ -111,6 +111,9 @@ namespace GranitWebApi.Data
             // PROFORMA
             modelBuilder.Entity<SalesProforma>().HasMany(x => x.Lines).WithOne(x => x.Proforma)
                 .HasForeignKey(x => x.ProformaId).OnDelete(DeleteBehavior.Restrict);
+            // EMAIL QUE
+            modelBuilder.Entity<EmailQueueAttachment>().HasOne(x => x.EmailQueue)
+                .WithMany(x => x.Attachments).HasForeignKey(x => x.EmailQueueId).OnDelete(DeleteBehavior.Cascade);
         }
 
         public DbSet<TechnicianModel> TechnicianLogs { get; set; }
@@ -146,6 +149,7 @@ namespace GranitWebApi.Data
         public DbSet<IzinTalepleri> IzinTalepleri { get; set; }
         public DbSet<IzinYillikBakiyePersonel> IzinYillikBakiyePersonel { get; set; }
         public DbSet<EmailQueue> EmailQueue { get; set; }
+        public DbSet<EmailQueueAttachment> EmailQueueAttachments { get; set; }
         // Upload
         public DbSet<PromanageOee> PromanageOee { get; set; }
         public DbSet<PromanageGunlukUretim> PromanageGunlukUretim { get; set; }

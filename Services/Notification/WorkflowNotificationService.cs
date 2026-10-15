@@ -9,17 +9,14 @@ namespace GranitWebApi.Services.Notifications
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
 
-        public WorkflowNotificationService(
-            AppDbContext context,
-            INotificationService notificationService)
+        public WorkflowNotificationService(AppDbContext context,INotificationService notificationService)
         {
             _context = context;
             _notificationService = notificationService;
         }
         public async Task SendWorkflowSubmittedAsync(int requestId)
         {
-            var request = await _context.ProcessRequest
-                .Include(x => x.Approvals)
+            var request = await _context.ProcessRequest.Include(x => x.Approvals)
                 .FirstOrDefaultAsync(x => x.Id == requestId);
 
             if (request == null)
@@ -28,16 +25,8 @@ namespace GranitWebApi.Services.Notifications
                 return;
             }
 
-
-            var approverIds = request.Approvals
-                .Where(x => x.IsActive)
-                .Select(x => x.ApproverId)
-                .Distinct()
-                .ToList();
-
-
-            Console.WriteLine($"Aktif onaycı sayısı: {approverIds.Count}");
-
+            var approverIds = request.Approvals.Where(x => x.IsActive)
+                .Select(x => x.ApproverId).Distinct().ToList();
 
             if (!approverIds.Any())
             {
@@ -45,67 +34,37 @@ namespace GranitWebApi.Services.Notifications
                 return;
             }
 
-
             var processName = await _context.WorkflowDefinition
-                .Where(x =>
-                    x.ProcessTypeId == request.ProcessTypeId &&
-                    x.IsActive)
-                .Select(x => x.Name)
-                .FirstOrDefaultAsync();
-
+                .Where(x => x.ProcessTypeId == request.ProcessTypeId && x.IsActive)
+                .Select(x => x.Name).FirstOrDefaultAsync();
 
             foreach (var approverId in approverIds)
             {
-
-                Console.WriteLine($"Mail hazırlanıyor. UserId: {approverId}");
-
-
-                var user = await _context.Users
-                    .FirstOrDefaultAsync(x => x.Id == approverId);
-
-
+                var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == approverId);
                 if (user == null)
                 {
                     Console.WriteLine($"User bulunamadı: {approverId}");
                     continue;
                 }
 
-
-                Console.WriteLine($"Email: {user.Email}");
-
-
-                if (string.IsNullOrWhiteSpace(user.Email))
-                {
-                    Console.WriteLine("Email boş.");
-                    continue;
-                }
-
-
                 var notification = new NotificationModel
                 {
                     To = user.Email,
 
-                    Subject = $"Yeni Onay Bekleyen {processName ?? "Talep"}",
+                    Subject = $"Yeni Onay Bekleyen {request.Title ?? "Talep"}",
 
                     Template = "WorkflowSubmitted",
 
                     Values = new Dictionary<string, string>
                     {
                         ["TalepNo"] = request.Id.ToString(),
-                        ["SurecAdi"] = processName ?? "-",
+                        ["SurecAdi"] = request.Title ?? "-",
                         ["Tarih"] = DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
                         ["Durum"] = request.Status
                     }
                 };
 
-
-                Console.WriteLine("NotificationService çağrılıyor...");
-
-
                 await _notificationService.SendAsync(notification);
-
-
-                Console.WriteLine("Mail gönderme tamamlandı.");
             }
         }
         public async Task SendWorkflowReturnedAsync(

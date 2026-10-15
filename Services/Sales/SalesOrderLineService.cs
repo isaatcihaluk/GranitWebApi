@@ -142,36 +142,69 @@ namespace GranitWebApi.Services.Sales
         }
 
         // CREATE COMPLETE
-        public async Task<SalesOrderLine?> CreateCompleteAsync(SalesOrderLine line, SalesOrderLineCKConfiguration? ckConfiguration,
-            SalesOrderLineUMConfiguration? umConfiguration, List<(int ImageTypeId, IFormFile File)> files)
+
+        public async Task<SalesOrderLine?> CreateCompleteAsync(
+            SalesOrderLine line,
+            SalesOrderLineCKConfiguration? ckConfiguration,
+            SalesOrderLineUMConfiguration? umConfiguration,
+            List<(int ImageTypeId, IFormFile File)> files)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             var savedFiles = new List<string>();
 
             try
             {
-                var salesOrder = await _context.SalesOrders.FirstOrDefaultAsync(x => x.Id == line.SalesOrderId);
-                if (salesOrder == null) { throw new Exception($"SalesOrder bulunamadı. Id: {line.SalesOrderId}"); }
+                files ??= new List<(int ImageTypeId, IFormFile File)>();
 
-                var lineNumber =
-                    await _context.SalesOrderLines
-                        .CountAsync(x =>
-                            x.SalesOrderId == line.SalesOrderId);
+                // =====================================================
+                // 1. SİPARİŞ KONTROLÜ
+                // =====================================================
 
-                line.LineNumber = lineNumber;
+                var salesOrder = await _context.SalesOrders
+                    .FirstOrDefaultAsync(x => x.Id == line.SalesOrderId);
 
-                if (line.Quantity <= 0) { throw new Exception("Ürün miktarı 0'dan büyük olmalıdır."); }
-                if (string.IsNullOrWhiteSpace(line.ProductGroupId)) { throw new Exception("Ürün grubu belirtilmelidir."); }
+                if (salesOrder == null)
+                {
+                    throw new Exception(
+                        $"SalesOrder bulunamadı. Id: {line.SalesOrderId}");
+                }
 
+                if (line.Quantity <= 0)
+                {
+                    throw new Exception(
+                        "Ürün miktarı 0'dan büyük olmalıdır.");
+                }
+
+                if (string.IsNullOrWhiteSpace(line.ProductGroupId))
+                {
+                    throw new Exception(
+                        "Ürün grubu belirtilmelidir.");
+                }
+
+                if (line.ProductGroupId != "1" &&
+                    line.ProductGroupId != "2" &&
+                    line.ProductGroupId != "3" &&
+                    line.ProductGroupId != "5")
+                {
+                    throw new Exception(
+                        "Bu ürün grubu için kayıt işlemi desteklenmiyor. " +
+                        $"ProductGroupId: '{line.ProductGroupId}'");
+                }
+
+                // =====================================================
+                // 2. ÜRÜN GRUBUNA GÖRE VALIDATION
+                // Ana kayıt oluşturulmadan önce doğrula.
+                // =====================================================
+
+                // CK
                 if (line.ProductGroupId == "1")
                 {
-                    // =====================================================
-                    // CK VALIDATION
-                    // =====================================================
-
                     if (ckConfiguration == null)
                     {
-                        throw new Exception("CK ürün konfigürasyonu belirtilmelidir.");
+                        throw new Exception(
+                            "CK ürün konfigürasyonu belirtilmelidir.");
                     }
 
                     if (string.IsNullOrWhiteSpace(ckConfiguration.ProductId))
@@ -191,7 +224,8 @@ namespace GranitWebApi.Services.Sales
 
                     if (string.IsNullOrWhiteSpace(ckConfiguration.BodyWingRal))
                     {
-                        throw new Exception("Gövde / Kanat rengi belirtilmelidir.");
+                        throw new Exception(
+                            "Gövde / Kanat rengi belirtilmelidir.");
                     }
 
                     if (string.IsNullOrWhiteSpace(ckConfiguration.PlasticColor1No))
@@ -204,74 +238,103 @@ namespace GranitWebApi.Services.Sales
                         throw new Exception("Plastik rengi 2 belirtilmelidir.");
                     }
                 }
+
+                // UM
                 else if (line.ProductGroupId == "2")
                 {
-                    // UM VALIDATION
                     if (umConfiguration == null)
                     {
-                        throw new Exception("UM ürün konfigürasyonu belirtilmelidir.");
+                        throw new Exception(
+                            "UM ürün konfigürasyonu belirtilmelidir.");
                     }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.BodyType))
-                    {
                         throw new Exception("Gövde tipi belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.BodyCode))
-                    {
                         throw new Exception("Gövde belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.IroningBoardCode))
-                    {
                         throw new Exception("Ütülük belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.FootCode))
-                    {
                         throw new Exception("Ayak belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.BodyIroningRal))
-                    {
-                        throw new Exception("Gövde / Ütülük rengi belirtilmelidir.");
-                    }
+                        throw new Exception(
+                            "Gövde / Ütülük rengi belirtilmelidir.");
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.BodyIroningColor))
-                    {
-                        throw new Exception("Gövde / Ütülük rengi belirtilmelidir.");
-                    }
+                        throw new Exception(
+                            "Gövde / Ütülük rengi belirtilmelidir.");
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.FootRal))
-                    {
                         throw new Exception("Ayak rengi belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.FootColor))
-                    {
                         throw new Exception("Ayak rengi belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.FabricCode))
-                    {
                         throw new Exception("Kumaş belirtilmelidir.");
-                    }
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.SpongeCode))
-                    {
                         throw new Exception("Sünger belirtilmelidir.");
-                    }
+
                     if (umConfiguration.SpongeQuantity <= 0)
-                    {
-                        throw new Exception("Sünger miktarı 0'dan büyük olmalıdır.");
-                    }
+                        throw new Exception(
+                            "Sünger miktarı 0'dan büyük olmalıdır.");
+
                     if (string.IsNullOrWhiteSpace(umConfiguration.PlasticCombinationNo))
-                    {
-                        throw new Exception("Plastik rengi belirtilmelidir.");
-                    }
-                }
-                else if (line.ProductGroupId == "5")
-                {
-                    if (string.IsNullOrWhiteSpace(line.CatalogCode)) { throw new Exception("Yedek kılıf türü belirtilmelidir."); }
-                    if (string.IsNullOrWhiteSpace(line.YKFabricCode)) { throw new Exception("Yedek kılıf kumaşı belirtilmelidir."); }
+                        throw new Exception(
+                            "Plastik rengi belirtilmelidir.");
                 }
 
-                else
+                // BU
+                else if (line.ProductGroupId == "3")
                 {
-                    throw new Exception(
-                        $"Bu ürün grubu için kayıt işlemi desteklenmiyor. " +
-                        $"ProductGroupId: '{line.ProductGroupId}'");
+                    if (string.IsNullOrWhiteSpace(line.CatalogCode))
+                        throw new Exception("Katalog kodu belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUColorRal))
+                        throw new Exception("Renk belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUColorDescription))
+                        throw new Exception("Renk açıklaması belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUPlasticRal))
+                        throw new Exception("Plastik RAL belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUPlasticColor))
+                        throw new Exception("Plastik rengi belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUEtiketAkmazCode))
+                        throw new Exception("Etiket akmaz belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.BUFabricsCode))
+                        throw new Exception("Kumaş belirtilmelidir.");
                 }
+
+                // YK
+                else if (line.ProductGroupId == "5")
+                {
+                    if (string.IsNullOrWhiteSpace(line.CatalogCode))
+                        throw new Exception(
+                            "Yedek kılıf türü belirtilmelidir.");
+
+                    if (string.IsNullOrWhiteSpace(line.YKFabricCode))
+                        throw new Exception(
+                            "Yedek kılıf kumaşı belirtilmelidir.");
+                }
+
+                // =====================================================
+                // 3. SATIR NUMARASI VE ANA SATIR
+                // =====================================================
+
+                var lineNumber = await _context.SalesOrderLines
+                    .CountAsync(x => x.SalesOrderId == line.SalesOrderId);
+
+                line.LineNumber = lineNumber;
+
                 line.Id = 0;
                 line.MainAssemblyCode = null;
                 line.ManualAssemblyCode = null;
@@ -282,13 +345,21 @@ namespace GranitWebApi.Services.Sales
                 line.UpdatedAt = null;
                 line.UpdatedBy = null;
                 line.DeletedFlag = false;
+
                 _context.SalesOrderLines.Add(line);
+
                 salesOrder.Status = "TASLAK";
+
+                // Ana satırın Id değerini almak için kaydet.
                 await _context.SaveChangesAsync();
+
+                // =====================================================
+                // 4. CK / UM KONFİGÜRASYONU
+                // Görsel yüklenmesine bağlı değildir.
+                // =====================================================
 
                 if (line.ProductGroupId == "1")
                 {
-                    // CK CONFIGURATION KAYDI
                     ckConfiguration!.Id = 0;
                     ckConfiguration.SalesOrderLineId = line.Id;
                     ckConfiguration.ProductGroupId = line.ProductGroupId;
@@ -297,12 +368,11 @@ namespace GranitWebApi.Services.Sales
                     ckConfiguration.UpdatedAt = null;
                     ckConfiguration.UpdatedBy = null;
 
-                    _context.SalesOrderLineCKConfigurations.Add(ckConfiguration);
+                    _context.SalesOrderLineCKConfigurations.Add(
+                        ckConfiguration);
                 }
                 else if (line.ProductGroupId == "2")
                 {
-                    // UM CONFIGURATION KAYDI
-
                     umConfiguration!.Id = 0;
                     umConfiguration.SalesOrderLineId = line.Id;
                     umConfiguration.ProductGroupId = line.ProductGroupId;
@@ -311,135 +381,170 @@ namespace GranitWebApi.Services.Sales
                     umConfiguration.UpdatedAt = null;
                     umConfiguration.UpdatedBy = null;
 
-                    _context.SalesOrderLineUMConfigurations.Add(umConfiguration);
-                }
-                else if (line.ProductGroupId == "5")
-                {
-                    if (string.IsNullOrWhiteSpace(line.CatalogCode)) { throw new Exception("Yedek kılıf türü belirtilmelidir."); }
-                    if (string.IsNullOrWhiteSpace(line.YKFabricCode)) { throw new Exception("Yedek kılıf kumaşı belirtilmelidir."); }
-                }
-                else if (line.ProductGroupId == "3")
-                {
-                    // =====================================================
-                    // BU VALIDATION
-                    // =====================================================
-
-                    if (string.IsNullOrWhiteSpace(line.CatalogCode))
-                    {
-                        throw new Exception("Katalog kodu belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUColorRal))
-                    {
-                        throw new Exception("Renk belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUColorDescription))
-                    {
-                        throw new Exception("Renk açıklaması belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUPlasticRal))
-                    {
-                        throw new Exception("Plastik RAL belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUPlasticColor))
-                    {
-                        throw new Exception("Plastik rengi belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUEtiketAkmazCode))
-                    {
-                        throw new Exception("Etiket akmaz belirtilmelidir.");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line.BUFabricsCode))
-                    {
-                        throw new Exception("Kumaş belirtilmelidir.");
-                    }
-                }
-                else if (line.ProductGroupId == "5")
-
-                    await _context.SaveChangesAsync();
-                var rootPath = _configuration["FileStorage:RootPath"];
-
-                if (string.IsNullOrWhiteSpace(rootPath)) { throw new Exception("FileStorage:RootPath tanımlı değil."); }
-                if (!Directory.Exists(rootPath)) { throw new Exception($"Root klasörü bulunamadı veya erişilemiyor: '{rootPath}'"); }
-                var salesOrderFolder = Path.Combine(rootPath, "SalesOrders", salesOrder.Id.ToString(), line.Id.ToString());
-                try
-                {
-                    Directory.CreateDirectory(salesOrderFolder);
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Dosya klasörü oluşturulamadı. " + $"Klasör: {salesOrderFolder}", ex);
+                    _context.SalesOrderLineUMConfigurations.Add(
+                        umConfiguration);
                 }
 
-                foreach (var item in files)
+                // Konfigürasyonları görsellerden bağımsız kaydet.
+                // BU ve YK için bu çağrı ana satır ve sipariş durumunu da
+                // kaydeder; CK / UM için konfigürasyonları da kaydeder.
+                await _context.SaveChangesAsync();
+
+                // =====================================================
+                // 5. GÖRSELLER
+                // Görsel yoksa dosya sistemi kontrollerini atla.
+                // =====================================================
+
+                if (files.Count > 0)
                 {
-                    var imageType = await _context.SalesOrderImageTypes.FirstOrDefaultAsync(x => x.Id == item.ImageTypeId && x.IsActive);
-                    if (imageType == null) { throw new Exception($"Görsel tipi bulunamadı. " + $"Id: {item.ImageTypeId}"); }
+                    var rootPath = _configuration["FileStorage:RootPath"];
 
-                    var duplicateType = files.Count(x => x.ImageTypeId == item.ImageTypeId);
-                    if (duplicateType > 1) { throw new Exception($"{imageType.Name} için yalnızca bir dosya yüklenebilir."); }
-                    if (item.File == null || item.File.Length == 0) { throw new Exception($"{imageType.Name} için dosya boş."); }
+                    if (string.IsNullOrWhiteSpace(rootPath))
+                    {
+                        throw new Exception(
+                            "FileStorage:RootPath tanımlı değil.");
+                    }
 
-                    var lastVersion =
-                        await _context.SalesOrderLineImages
+                    if (!Directory.Exists(rootPath))
+                    {
+                        throw new Exception(
+                            $"Root klasörü bulunamadı veya erişilemiyor: '{rootPath}'");
+                    }
+
+                    var salesOrderFolder = Path.Combine(
+                        rootPath,
+                        "SalesOrders",
+                        salesOrder.Id.ToString(),
+                        line.Id.ToString());
+
+                    try
+                    {
+                        Directory.CreateDirectory(salesOrderFolder);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception(
+                            $"Dosya klasörü oluşturulamadı. Klasör: {salesOrderFolder}",
+                            ex);
+                    }
+
+                    // Aynı görsel tipinden birden fazla dosya kontrolü.
+                    var duplicateType = files
+                        .GroupBy(x => x.ImageTypeId)
+                        .FirstOrDefault(g => g.Count() > 1);
+
+                    if (duplicateType != null)
+                    {
+                        throw new Exception(
+                            $"Görsel tipi {duplicateType.Key} için " +
+                            "yalnızca bir dosya yüklenebilir.");
+                    }
+
+                    foreach (var item in files)
+                    {
+                        if (item.File == null || item.File.Length == 0)
+                        {
+                            throw new Exception(
+                                $"Görsel tipi {item.ImageTypeId} için dosya boş.");
+                        }
+
+                        var imageType = await _context.SalesOrderImageTypes
+                            .FirstOrDefaultAsync(
+                                x => x.Id == item.ImageTypeId && x.IsActive);
+
+                        if (imageType == null)
+                        {
+                            throw new Exception(
+                                $"Görsel tipi bulunamadı. Id: {item.ImageTypeId}");
+                        }
+
+                        var lastVersion = await _context.SalesOrderLineImages
                             .Where(x =>
                                 x.SalesOrderLineId == line.Id &&
                                 x.ImageTypeId == item.ImageTypeId)
                             .Select(x => (int?)x.VersionNo)
                             .MaxAsync() ?? 0;
 
-                    var versionNo = lastVersion + 1;
+                        var versionNo = lastVersion + 1;
 
-                    var typeFolder = Path.Combine(salesOrderFolder, imageType.Code);
-                    Directory.CreateDirectory(typeFolder);
+                        var typeFolder = Path.Combine(
+                            salesOrderFolder,
+                            imageType.Code);
 
-                    var originalFileName = Path.GetFileName(item.File.FileName);
-                    var extension = Path.GetExtension(originalFileName);
-                    var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalFileName);
+                        Directory.CreateDirectory(typeFolder);
 
-                    foreach (var invalidChar in Path.GetInvalidFileNameChars())
-                    {
-                        fileNameWithoutExtension = fileNameWithoutExtension.Replace(invalidChar, '_');
+                        var originalFileName =
+                            Path.GetFileName(item.File.FileName);
+
+                        var extension =
+                            Path.GetExtension(originalFileName);
+
+                        var fileNameWithoutExtension =
+                            Path.GetFileNameWithoutExtension(originalFileName);
+
+                        foreach (var invalidChar in Path.GetInvalidFileNameChars())
+                        {
+                            fileNameWithoutExtension =
+                                fileNameWithoutExtension.Replace(invalidChar, '_');
+                        }
+
+                        var storedFileName =
+                            $"v{versionNo}_{fileNameWithoutExtension}{extension}";
+
+                        var physicalFilePath = Path.Combine(
+                            typeFolder,
+                            storedFileName);
+
+                        await using (var stream = new FileStream(
+                            physicalFilePath,
+                            FileMode.CreateNew))
+                        {
+                            await item.File.CopyToAsync(stream);
+                        }
+
+                        savedFiles.Add(physicalFilePath);
+
+                        var relativePath = Path.Combine(
+                            "SalesOrders",
+                            salesOrder.Id.ToString(),
+                            line.Id.ToString(),
+                            imageType.Code,
+                            storedFileName);
+
+                        var image = new SalesOrderLineImage
+                        {
+                            SalesOrderLineId = line.Id,
+                            ImageTypeId = imageType.Id,
+                            FileName = originalFileName,
+                            FilePath = relativePath,
+                            VersionNo = versionNo,
+                            IsActive = true,
+                            CreatedAt = DateTime.Now,
+                            CreatedBy = _userContext.UserId
+                        };
+
+                        _context.SalesOrderLineImages.Add(image);
                     }
-                    var storedFileName = $"v{versionNo}_{fileNameWithoutExtension}{extension}";
-                    var physicalFilePath = Path.Combine(typeFolder, storedFileName);
 
-                    await using (var stream = new FileStream(physicalFilePath, FileMode.CreateNew))
-                    {
-                        await item.File.CopyToAsync(stream);
-                    }
-                    savedFiles.Add(physicalFilePath);
-
-                    var relativePath = Path.Combine("SalesOrders", salesOrder.Id.ToString(), line.Id.ToString(), imageType.Code, storedFileName);
-
-                    var image = new SalesOrderLineImage
-                    {
-                        SalesOrderLineId = line.Id,
-                        ImageTypeId = imageType.Id,
-                        FileName = originalFileName,
-                        FilePath = relativePath,
-                        VersionNo = versionNo,
-                        IsActive = true,
-                        CreatedAt = DateTime.Now,
-                        CreatedBy = _userContext.UserId
-                    };
-
-                    _context.SalesOrderLineImages.Add(image);
+                    // Tüm görsel kayıtlarını birlikte kaydet.
                     await _context.SaveChangesAsync();
                 }
 
+                // =====================================================
+                // 6. TRANSACTION TAMAMLA
+                // =====================================================
+
                 await transaction.CommitAsync();
+
                 line.SalesOrder = null;
+
                 return line;
             }
             catch
             {
                 await transaction.RollbackAsync();
+
+                // Veritabanı işlemi başarısızsa fiziksel dosyaları temizle.
                 foreach (var filePath in savedFiles)
                 {
                     try
@@ -451,12 +556,14 @@ namespace GranitWebApi.Services.Sales
                     }
                     catch
                     {
-                        // Cleanup hatası ana hatayı ezmesin.
+                        // Temizlik hatası asıl hatayı ezmesin.
                     }
                 }
+
                 throw;
             }
         }
+
 
         // GET FOR EDIT
         public async Task<SalesOrderLineEditResult?> GetForEditAsync(long lineId)
@@ -570,33 +677,79 @@ namespace GranitWebApi.Services.Sales
         }
 
         // UPDATE COMPLETE
-        public async Task<SalesOrderLine?> UpdateCompleteAsync(long id, SalesOrderLineUpdateModel request,
-            List<(int ImageTypeId, IFormFile File)> files, List<long> existingImageIds)
+
+        public async Task<SalesOrderLine?> UpdateCompleteAsync(long id,SalesOrderLineUpdateModel request,
+            List<(int ImageTypeId, IFormFile File)> files,List<long> existingImageIds)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             var savedFiles = new List<string>();
+
             try
             {
+                // =====================================================
+                // 1. TEMEL KONTROLLER
+                // =====================================================
+
                 if (request.LineId != id)
                 {
-                    throw new Exception("Güncellenecek sipariş satırı bilgisi uyuşmuyor.");
+                    throw new Exception(
+                        "Güncellenecek sipariş satırı bilgisi uyuşmuyor.");
                 }
 
-                var line = await _context.SalesOrderLines.FirstOrDefaultAsync(x => x.Id == id && !x.DeletedFlag);
-                if (line == null) { return null; }
+                var line = await _context.SalesOrderLines
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.DeletedFlag);
 
-                var salesOrder = await _context.SalesOrders.FirstOrDefaultAsync(x => x.Id == line.SalesOrderId);
-                if (salesOrder == null) { throw new Exception($"SalesOrder bulunamadı. Id: {line.SalesOrderId}"); }
+                if (line == null)
+                {
+                    return null;
+                }
 
-                if (request.SalesOrderId != line.SalesOrderId) { throw new Exception("Sipariş satırı farklı bir siparişe taşınamaz."); }
-                if (files == null) { files = new List<(int ImageTypeId, IFormFile File)>(); }
-                if (existingImageIds == null) { existingImageIds = new List<long>(); }
-                if (request.Quantity <= 0) { throw new Exception("Ürün miktarı 0'dan büyük olmalıdır."); }
-                if (string.IsNullOrWhiteSpace(request.ProductGroupId)) { throw new Exception("Ürün grubu belirtilmelidir."); }
+                var salesOrder = await _context.SalesOrders
+                    .FirstOrDefaultAsync(x => x.Id == line.SalesOrderId);
 
+                if (salesOrder == null)
+                {
+                    throw new Exception(
+                        $"SalesOrder bulunamadı. Id: {line.SalesOrderId}");
+                }
+
+                if (request.SalesOrderId != line.SalesOrderId)
+                {
+                    throw new Exception(
+                        "Sipariş satırı farklı bir siparişe taşınamaz.");
+                }
+
+                // Ürün grubu değişikliğine izin verme.
+                // Böylece eski konfigürasyonun yanlış tabloda kalması önlenir.
+                if (request.ProductGroupId != line.ProductGroupId)
+                {
+                    throw new Exception(
+                        "Mevcut sipariş satırının ürün grubu değiştirilemez.");
+                }
+
+                files ??= new List<(int ImageTypeId, IFormFile File)>();
+                existingImageIds ??= new List<long>();
+
+                if (request.Quantity <= 0)
+                {
+                    throw new Exception(
+                        "Ürün miktarı 0'dan büyük olmalıdır.");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.ProductGroupId))
+                {
+                    throw new Exception("Ürün grubu belirtilmelidir.");
+                }
+
+                // =====================================================
+                // 2. ÜRÜN GRUBUNA GÖRE VALIDATION
+                // =====================================================
+
+                // CK
                 if (request.ProductGroupId == "1")
                 {
-                    // CK validation
                     if (string.IsNullOrWhiteSpace(request.ProductId))
                         throw new Exception("Ürün belirtilmelidir.");
 
@@ -607,7 +760,8 @@ namespace GranitWebApi.Services.Sales
                         throw new Exception("Ayak rengi belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.BodyWingRal))
-                        throw new Exception("Gövde / Kanat rengi belirtilmelidir.");
+                        throw new Exception(
+                            "Gövde / Kanat rengi belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.PlasticColor1No))
                         throw new Exception("Plastik rengi belirtilmelidir.");
@@ -615,9 +769,10 @@ namespace GranitWebApi.Services.Sales
                     if (string.IsNullOrWhiteSpace(request.PlasticColor2No))
                         throw new Exception("Plastik rengi 2 belirtilmelidir.");
                 }
+
+                // UM
                 else if (request.ProductGroupId == "2")
                 {
-                    // UM validation
                     if (string.IsNullOrWhiteSpace(request.BodyType))
                         throw new Exception("UM gövde tipi belirtilmelidir.");
 
@@ -631,10 +786,12 @@ namespace GranitWebApi.Services.Sales
                         throw new Exception("UM ayak belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.BodyIroningRal))
-                        throw new Exception("UM gövde / ütülük rengi belirtilmelidir.");
+                        throw new Exception(
+                            "UM gövde / ütülük rengi belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.BodyIroningColor))
-                        throw new Exception("UM gövde / ütülük renk adı belirtilmelidir.");
+                        throw new Exception(
+                            "UM gövde / ütülük renk adı belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.FootRal))
                         throw new Exception("UM ayak RAL rengi belirtilmelidir.");
@@ -654,8 +811,12 @@ namespace GranitWebApi.Services.Sales
                     if (string.IsNullOrWhiteSpace(request.SpongeName))
                         throw new Exception("UM sünger adı belirtilmelidir.");
 
-                    if (request.SpongeQuantity == null || request.SpongeQuantity <= 0)
-                        throw new Exception("UM sünger miktarı 0'dan büyük olmalıdır.");
+                    if (request.SpongeQuantity == null ||
+                        request.SpongeQuantity <= 0)
+                    {
+                        throw new Exception(
+                            "UM sünger miktarı 0'dan büyük olmalıdır.");
+                    }
 
                     if (request.HasFis)
                     {
@@ -670,61 +831,98 @@ namespace GranitWebApi.Services.Sales
                     }
 
                     if (string.IsNullOrWhiteSpace(request.PlasticCombinationNo))
-                        throw new Exception("UM plastik kombinasyonu belirtilmelidir.");
+                        throw new Exception(
+                            "UM plastik kombinasyonu belirtilmelidir.");
 
-                    if (string.IsNullOrWhiteSpace(request.PlasticCombinationDescription))
-                        throw new Exception("UM plastik kombinasyon açıklaması belirtilmelidir.");
+                    if (string.IsNullOrWhiteSpace(
+                        request.PlasticCombinationDescription))
+                    {
+                        throw new Exception(
+                            "UM plastik kombinasyon açıklaması belirtilmelidir.");
+                    }
                 }
-                else if (line.ProductGroupId == "5")
+
+                // YK
+                else if (request.ProductGroupId == "5")
                 {
                     if (string.IsNullOrWhiteSpace(request.CatalogCode))
-                        throw new Exception("Yedek kılıf türü belirtilmelidir.");
+                        throw new Exception(
+                            "Yedek kılıf türü belirtilmelidir.");
 
                     if (string.IsNullOrWhiteSpace(request.YKFabricCode))
-                        throw new Exception("Yedek kılıf kumaşı belirtilmelidir.");
+                        throw new Exception(
+                            "Yedek kılıf kumaşı belirtilmelidir.");
                 }
                 else
                 {
-                    throw new Exception($"Desteklenmeyen ürün grubu: '{request.ProductGroupId}'");
+                    throw new Exception(
+                        $"Bu güncelleme metodu için desteklenmeyen ürün grubu: " +
+                        $"'{request.ProductGroupId}'.");
                 }
 
+                // =====================================================
+                // 3. SATIR NUMARASI KONTROLÜ
+                // =====================================================
+
                 var lineExists = await _context.SalesOrderLines
-                        .AnyAsync(x => x.Id != id && x.SalesOrderId == line.SalesOrderId &&
-                            x.LineNumber == request.LineNumber && !x.DeletedFlag);
+                    .AnyAsync(x =>
+                        x.Id != id &&
+                        x.SalesOrderId == line.SalesOrderId &&
+                        x.LineNumber == request.LineNumber &&
+                        !x.DeletedFlag);
 
                 if (lineExists)
                 {
                     throw new Exception(
                         $"Bu siparişte {request.LineNumber} numaralı " +
-                        $"satır zaten mevcut.");
+                        "satır zaten mevcut.");
                 }
 
+                // =====================================================
+                // 4. ANA SATIR GÜNCELLEME
+                // =====================================================
+
                 line.LineNumber = request.LineNumber;
-                line.ProductGroupId = request.ProductGroupId;
                 line.Quantity = request.Quantity;
                 line.ProductName = request.ProductName;
                 line.CatalogCode = request.CatalogCode;
                 line.KoliId = request.KoliId;
                 line.KoliKod = request.KoliKod;
                 line.KoliIciMiktar = request.KoliIciMiktar;
+                line.YKFabricCode = request.YKFabricCode;
+
                 line.UpdatedAt = DateTime.Now;
                 line.UpdatedBy = _userContext.UserId;
-                line.YKFabricCode = request.YKFabricCode;
+
                 line.ShrinkliKod = "";
                 line.ShrinkliAd = "";
+
                 salesOrder.Status = "TASLAK";
+
+                // =====================================================
+                // 5. CK KONFİGÜRASYONU
+                // Kayıt yoksa oluştur, varsa güncelle.
+                // =====================================================
 
                 if (request.ProductGroupId == "1")
                 {
-                    // CK CONFIGURATION UPDATE
-
-                    var configuration = await _context.SalesOrderLineCKConfigurations.FirstOrDefaultAsync(x => x.SalesOrderLineId == line.Id);
+                    var configuration =
+                        await _context.SalesOrderLineCKConfigurations
+                            .FirstOrDefaultAsync(
+                                x => x.SalesOrderLineId == line.Id);
 
                     if (configuration == null)
                     {
-                        throw new Exception(
-                            $"Sipariş satırına ait CK configuration bulunamadı. " +
-                            $"SalesOrderLineId: {line.Id}");
+                        configuration = new SalesOrderLineCKConfiguration
+                        {
+                            SalesOrderLineId = line.Id,
+                            ProductGroupId = line.ProductGroupId,
+                            CreatedAt = DateTime.Now,
+                            CreatedBy = _userContext.UserId
+                        };
+
+                        _context.SalesOrderLineCKConfigurations.Add(
+                            configuration);
                     }
 
                     configuration.ProductTypeId = request.ProductTypeId;
@@ -738,17 +936,31 @@ namespace GranitWebApi.Services.Sales
                     configuration.UpdatedAt = DateTime.Now;
                     configuration.UpdatedBy = _userContext.UserId;
                 }
+
+                // =====================================================
+                // 6. UM KONFİGÜRASYONU
+                // Kayıt yoksa oluştur, varsa güncelle.
+                // =====================================================
+
                 else if (request.ProductGroupId == "2")
                 {
-                    // UM CONFIGURATION UPDATE
-                    var configuration = await _context.SalesOrderLineUMConfigurations
-                            .FirstOrDefaultAsync(x => x.SalesOrderLineId == line.Id);
+                    var configuration =
+                        await _context.SalesOrderLineUMConfigurations
+                            .FirstOrDefaultAsync(
+                                x => x.SalesOrderLineId == line.Id);
 
                     if (configuration == null)
                     {
-                        throw new Exception(
-                            $"Sipariş satırına ait UM configuration bulunamadı. " +
-                            $"SalesOrderLineId: {line.Id}");
+                        configuration = new SalesOrderLineUMConfiguration
+                        {
+                            SalesOrderLineId = line.Id,
+                            ProductGroupId = line.ProductGroupId,
+                            CreatedAt = DateTime.Now,
+                            CreatedBy = _userContext.UserId
+                        };
+
+                        _context.SalesOrderLineUMConfigurations.Add(
+                            configuration);
                     }
 
                     configuration.BodyType = request.BodyType!;
@@ -765,32 +977,54 @@ namespace GranitWebApi.Services.Sales
                     configuration.SpongeName = request.SpongeName!;
                     configuration.SpongeQuantity = request.SpongeQuantity!.Value;
                     configuration.HasFis = request.HasFis;
-                    configuration.FisType = request.HasFis ? request.FisType : null;
-                    configuration.FisCode = request.HasFis ? request.FisCode : null;
-                    configuration.FisName = request.HasFis ? request.FisName : null;
-                    configuration.PlasticCombinationNo = request.PlasticCombinationNo!;
-                    configuration.PlasticCombinationDescription = request.PlasticCombinationDescription!;
+                    configuration.FisType =
+                        request.HasFis ? request.FisType : null;
+                    configuration.FisCode =
+                        request.HasFis ? request.FisCode : null;
+                    configuration.FisName =
+                        request.HasFis ? request.FisName : null;
+                    configuration.PlasticCombinationNo =
+                        request.PlasticCombinationNo!;
+                    configuration.PlasticCombinationDescription =
+                        request.PlasticCombinationDescription!;
                     configuration.ProductGroupId = request.ProductGroupId;
                     configuration.UpdatedAt = DateTime.Now;
                     configuration.UpdatedBy = _userContext.UserId;
                 }
 
-                await _context.SaveChangesAsync();
-                await _context.SaveChangesAsync();
+
+                // =====================================================
+                // 7. MEVCUT GÖRSELLER
+                // Frontend'in gönderdiği ID listesi, korunacak
+                // mevcut görsellerin kesin listesidir.
+                // =====================================================
 
                 var existingImages = await _context.SalesOrderLineImages
-                        .Where(x => x.SalesOrderLineId == line.Id && x.IsActive).ToListAsync();
+                    .Where(x =>
+                        x.SalesOrderLineId == line.Id &&
+                        x.IsActive)
+                    .ToListAsync();
 
-                var keepImageIds = existingImageIds.Distinct().ToHashSet();
-                var invalidImageIds = keepImageIds.Where(id => existingImages.All(x => x.Id != id)).ToList();
+                var keepImageIds = (existingImageIds ?? new List<long>())
+                    .Distinct()
+                    .ToHashSet();
+
+                // Gönderilen ID'lerin bu satırın aktif görsellerine
+                // ait olduğunu doğrula.
+                var invalidImageIds = keepImageIds
+                    .Where(imageId =>
+                        existingImages.All(x => x.Id != imageId))
+                    .ToList();
 
                 if (invalidImageIds.Any())
                 {
                     throw new Exception(
                         "Gönderilen mevcut görsellerden bazıları " +
-                        "bu sipariş satırına ait değil.");
+                        "bu sipariş satırına ait değil veya artık aktif değil.");
                 }
 
+                // Korunacak listede bulunmayan mevcut görselleri pasifleştir.
+                // Liste boşsa tüm mevcut görseller pasif olur.
                 foreach (var image in existingImages)
                 {
                     if (!keepImageIds.Contains(image.Id))
@@ -800,97 +1034,177 @@ namespace GranitWebApi.Services.Sales
                         image.UpdatedBy = _userContext.UserId;
                     }
                 }
+
+
+                // Not: existingImageIds boşsa mevcut görselleri koruyoruz.
+                // Böylece ID listesi gönderilmediğinde tüm görseller
+                // yanlışlıkla pasifleştirilmez.
+
+                // =====================================================
+                // 8. VERİTABANI KAYDI
+                // =====================================================
+
                 await _context.SaveChangesAsync();
 
-                var rootPath = _configuration["FileStorage:RootPath"];
-                if (string.IsNullOrWhiteSpace(rootPath)) { throw new Exception("FileStorage:RootPath tanımlı değil."); }
-                if (!Directory.Exists(rootPath)) { throw new Exception($"Root klasörü bulunamadı veya erişilemiyor: '{rootPath}'"); }
+                // =====================================================
+                // 9. YENİ GÖRSELLER
+                // Yalnızca dosya geldiyse dosya sistemi kontrolleri yap.
+                // =====================================================
 
-                var salesOrderFolder = Path.Combine(rootPath, "SalesOrders", salesOrder.Id.ToString(), line.Id.ToString());
-
-                try
+                if (files.Count > 0)
                 {
-                    Directory.CreateDirectory(salesOrderFolder);
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Dosya klasörü oluşturulamadı. " + $"Klasör: {salesOrderFolder}", ex);
-                }
+                    // Aynı görsel tipine birden fazla dosya gönderilemez.
+                    var duplicateType = files
+                        .GroupBy(x => x.ImageTypeId)
+                        .FirstOrDefault(g => g.Count() > 1);
 
-                foreach (var item in files)
-                {
-                    var imageType = await _context.SalesOrderImageTypes.FirstOrDefaultAsync(x => x.Id == item.ImageTypeId && x.IsActive);
-
-                    if (imageType == null)
-                    {
-                        throw new Exception($"Görsel tipi bulunamadı. " + $"Id: {item.ImageTypeId}");
-                    }
-
-                    var duplicateType = files.Count(x => x.ImageTypeId == item.ImageTypeId);
-                    if (duplicateType > 1)
+                    if (duplicateType != null)
                     {
                         throw new Exception(
-                            $"{imageType.Name} için yalnızca bir dosya " +
-                            $"yüklenebilir.");
+                            $"Görsel tipi {duplicateType.Key} için " +
+                            "yalnızca bir dosya yüklenebilir.");
                     }
 
-                    if (item.File == null || item.File.Length == 0) { throw new Exception($"{imageType.Name} için dosya boş."); }
-                    var activeImages = await _context.SalesOrderLineImages
-                            .Where(x =>
-                                x.SalesOrderLineId == line.Id &&
-                                x.ImageTypeId == item.ImageTypeId &&
-                                x.IsActive)
-                            .ToListAsync();
-
-                    foreach (var oldImage in activeImages)
+                    foreach (var item in files)
                     {
-                        oldImage.IsActive = false;
-                        oldImage.UpdatedAt = DateTime.Now;
-                        oldImage.UpdatedBy = _userContext.UserId;
+                        if (item.File == null || item.File.Length == 0)
+                        {
+                            throw new Exception(
+                                $"Görsel tipi {item.ImageTypeId} için dosya boş.");
+                        }
+
+                        var imageType =
+                            await _context.SalesOrderImageTypes
+                                .FirstOrDefaultAsync(
+                                    x => x.Id == item.ImageTypeId && x.IsActive);
+
+                        if (imageType == null)
+                        {
+                            throw new Exception(
+                                $"Görsel tipi bulunamadı. Id: {item.ImageTypeId}");
+                        }
                     }
-                    await _context.SaveChangesAsync();
 
-                    var lastVersion =
-                        await _context.SalesOrderLineImages
-                            .Where(x => x.SalesOrderLineId == line.Id && x.ImageTypeId == item.ImageTypeId)
-                            .Select(x => (int?)x.VersionNo).MaxAsync() ?? 0;
+                    var rootPath = _configuration["FileStorage:RootPath"];
 
-                    var versionNo = lastVersion + 1;
-                    var typeFolder = Path.Combine(salesOrderFolder, imageType.Code);
-                    Directory.CreateDirectory(typeFolder);
-                    var originalFileName = Path.GetFileName(item.File.FileName);
-                    var extension = Path.GetExtension(originalFileName);
-                    var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalFileName);
-
-                    foreach (var invalidChar in Path.GetInvalidFileNameChars())
+                    if (string.IsNullOrWhiteSpace(rootPath))
                     {
-                        fileNameWithoutExtension = fileNameWithoutExtension.Replace(invalidChar, '_');
+                        throw new Exception(
+                            "FileStorage:RootPath tanımlı değil.");
                     }
-                    var storedFileName = $"v{versionNo}_{fileNameWithoutExtension}{extension}";
-                    var physicalFilePath = Path.Combine(typeFolder, storedFileName);
 
-                    await using (var stream = new FileStream(physicalFilePath, FileMode.CreateNew))
+                    if (!Directory.Exists(rootPath))
                     {
-                        await item.File.CopyToAsync(stream);
+                        throw new Exception(
+                            $"Root klasörü bulunamadı veya erişilemiyor: '{rootPath}'");
                     }
-                    savedFiles.Add(physicalFilePath);
 
-                    var relativePath = Path.Combine("SalesOrders", salesOrder.Id.ToString(), line.Id.ToString(), imageType.Code, storedFileName);
-                    var image = new SalesOrderLineImage
+                    var salesOrderFolder = Path.Combine(
+                        rootPath,
+                        "SalesOrders",
+                        salesOrder.Id.ToString(),
+                        line.Id.ToString());
+
+                    Directory.CreateDirectory(salesOrderFolder);
+
+                    foreach (var item in files)
                     {
-                        SalesOrderLineId = line.Id,
-                        ImageTypeId = imageType.Id,
-                        FileName = originalFileName,
-                        FilePath = relativePath,
-                        VersionNo = versionNo,
-                        IsActive = true,
-                        CreatedAt = DateTime.Now,
-                        CreatedBy = _userContext.UserId
-                    };
+                        var imageType =
+                            await _context.SalesOrderImageTypes
+                                .FirstAsync(
+                                    x => x.Id == item.ImageTypeId && x.IsActive);
 
-                    _context.SalesOrderLineImages.Add(image);
+                        // Aynı tipteki eski aktif görselleri pasifleştir.
+                        var activeImages =
+                            await _context.SalesOrderLineImages
+                                .Where(x =>
+                                    x.SalesOrderLineId == line.Id &&
+                                    x.ImageTypeId == item.ImageTypeId &&
+                                    x.IsActive)
+                                .ToListAsync();
+
+                        foreach (var oldImage in activeImages)
+                        {
+                            oldImage.IsActive = false;
+                            oldImage.UpdatedAt = DateTime.Now;
+                            oldImage.UpdatedBy = _userContext.UserId;
+                        }
+
+                        var lastVersion =
+                            await _context.SalesOrderLineImages
+                                .Where(x =>
+                                    x.SalesOrderLineId == line.Id &&
+                                    x.ImageTypeId == item.ImageTypeId)
+                                .Select(x => (int?)x.VersionNo)
+                                .MaxAsync() ?? 0;
+
+                        var versionNo = lastVersion + 1;
+
+                        var typeFolder = Path.Combine(
+                            salesOrderFolder,
+                            imageType.Code);
+
+                        Directory.CreateDirectory(typeFolder);
+
+                        var originalFileName =
+                            Path.GetFileName(item.File.FileName);
+
+                        var extension =
+                            Path.GetExtension(originalFileName);
+
+                        var fileNameWithoutExtension =
+                            Path.GetFileNameWithoutExtension(originalFileName);
+
+                        foreach (var invalidChar in Path.GetInvalidFileNameChars())
+                        {
+                            fileNameWithoutExtension =
+                                fileNameWithoutExtension.Replace(invalidChar, '_');
+                        }
+
+                        var storedFileName =
+                            $"v{versionNo}_{fileNameWithoutExtension}{extension}";
+
+                        var physicalFilePath = Path.Combine(
+                            typeFolder,
+                            storedFileName);
+
+                        await using (var stream = new FileStream(
+                            physicalFilePath,
+                            FileMode.CreateNew))
+                        {
+                            await item.File.CopyToAsync(stream);
+                        }
+
+                        savedFiles.Add(physicalFilePath);
+
+                        var relativePath = Path.Combine(
+                            "SalesOrders",
+                            salesOrder.Id.ToString(),
+                            line.Id.ToString(),
+                            imageType.Code,
+                            storedFileName);
+
+                        var image = new SalesOrderLineImage
+                        {
+                            SalesOrderLineId = line.Id,
+                            ImageTypeId = imageType.Id,
+                            FileName = originalFileName,
+                            FilePath = relativePath,
+                            VersionNo = versionNo,
+                            IsActive = true,
+                            CreatedAt = DateTime.Now,
+                            CreatedBy = _userContext.UserId
+                        };
+
+                        _context.SalesOrderLineImages.Add(image);
+                    }
+
                     await _context.SaveChangesAsync();
                 }
+
+                // =====================================================
+                // 10. TRANSACTION TAMAMLA
+                // =====================================================
                 await transaction.CommitAsync();
                 line.SalesOrder = null;
                 return line;
@@ -898,6 +1212,7 @@ namespace GranitWebApi.Services.Sales
             catch
             {
                 await transaction.RollbackAsync();
+
                 foreach (var filePath in savedFiles)
                 {
                     try
@@ -909,12 +1224,14 @@ namespace GranitWebApi.Services.Sales
                     }
                     catch
                     {
-                        // Cleanup hatası ana hatayı ezmesin.
+                        // Temizlik hatası asıl hatayı ezmesin.
                     }
                 }
+
                 throw;
             }
         }
+
 
         // GET PRODUCT BOXES
         public async Task<List<ProductBox>> GetProductBoxesAsync(string urunGrupId, string katalogKod, string koliTuru, string? musteriKod)

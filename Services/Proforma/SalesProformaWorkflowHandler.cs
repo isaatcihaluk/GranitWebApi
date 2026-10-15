@@ -1,5 +1,5 @@
 ﻿using GranitWebApi.Data;
-using GranitWebApi.Services.Notifications;
+using GranitWebApi.Services.Notification;
 using GranitWebApi.Workflow.Interfaces;
 using GranitWebApi.Workflow.Models;
 using Microsoft.EntityFrameworkCore;
@@ -10,24 +10,18 @@ namespace GranitWebApi.Services.Proforma
     public class SalesProformaWorkflowHandler : IWorkflowProcessHandler
     {
         private readonly AppDbContext _context;
-        private readonly WorkflowNotificationService _notificationService;
+        private readonly SalesProformaNotificationService _notificationService;
 
-        public SalesProformaWorkflowHandler(AppDbContext context, WorkflowNotificationService notificationService)
+        public SalesProformaWorkflowHandler(AppDbContext context, SalesProformaNotificationService notificationService)
         {
             _context = context;
             _notificationService = notificationService;
         }
 
-        public string ProcessTypeCode =>
-            "SATIS_PROFORMA";
+        public string ProcessTypeCode => "SATIS_PROFORMA";
 
         #region Step Completed
-
-        public async Task<WorkflowStepResult>
-            OnStepCompletedAsync(
-                ProcessRequest request,
-                int completedStep,
-                int userId)
+        public async Task<WorkflowStepResult>OnStepCompletedAsync(ProcessRequest request,int completedStep,int userId)
         {
             var result = new WorkflowStepResult
             {
@@ -35,13 +29,8 @@ namespace GranitWebApi.Services.Proforma
                 CurrentStep = completedStep
             };
 
-            if (request.EntityId == null)
-                return result;
-
-            var proforma =
-                await _context.SalesProformas
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == request.EntityId.Value);
+            if (request.EntityId == null) return result;
+            var proforma = await _context.SalesProformas.FirstOrDefaultAsync(x => x.Id == request.EntityId.Value);
 
             if (proforma == null)
             {
@@ -60,34 +49,24 @@ namespace GranitWebApi.Services.Proforma
              * Daha sonra finans step'i manuel olarak
              * aktive edilir.
              */
-            if (completedStep == 1 &&
-    IsCashAgainstDocumentsProforma(request))
+            if (completedStep == 1 && IsCashAgainstDocumentsProforma(request))
             {
                 result.CompleteWorkflow = true;
                 return result;
             }
-            if (completedStep == 1 &&
-    IsDeferredPaymentWorkflow(request))
+            if (completedStep == 1 && IsDeferredPaymentWorkflow(request))
             {
                 result.CompleteWorkflow = true;
                 return result;
             }
-            if (completedStep == 1 &&
-                IsPrepaymentWorkflow(request))
+            if (completedStep == 1 && IsPrepaymentWorkflow(request))
             {
-                proforma.Status =
-                    "ON_ODEME_BEKLIYOR";
-
-                proforma.UpdatedAt =
-                    DateTime.Now;
-
-                proforma.UpdatedBy =
-                    userId;
-
+                proforma.Status = "ON_ODEME_BEKLIYOR";
+                proforma.UpdatedAt = DateTime.Now;
+                proforma.UpdatedBy = userId;
                 result.PauseWorkflow = true;
                 result.CurrentStep = 0;
                 await _notificationService.SendPrepaymentRequiredAsync(request.Id);
-
                 return result;
             }
 
@@ -97,26 +76,16 @@ namespace GranitWebApi.Services.Proforma
             if (completedStep == 2 &&
                 IsPrepaymentWorkflow(request))
             {
-                var payment =
-                    await _context.SalesProformaPayments
-                        .Where(x =>
-                            x.ProformaId ==
-                                request.EntityId.Value &&
-                            x.Status ==
-                                "FINANS_ONAYINDA")
-                        .OrderByDescending(x => x.Id)
-                        .FirstOrDefaultAsync();
+                var payment = await _context.SalesProformaPayments
+                        .Where(x => x.ProformaId == request.EntityId.Value &&
+                            x.Status == "FINANS_ONAYINDA")
+                        .OrderByDescending(x => x.Id).FirstOrDefaultAsync();
 
                 if (payment != null)
                 {
-                    payment.Status =
-                        "ONAYLANDI";
-
-                    payment.UpdatedAt =
-                        DateTime.Now;
-
-                    payment.UpdatedBy =
-                        userId;
+                    payment.Status ="ONAYLANDI";
+                    payment.UpdatedAt =DateTime.Now;
+                    payment.UpdatedBy =userId;
                 }
 
                 /*
@@ -126,35 +95,19 @@ namespace GranitWebApi.Services.Proforma
                  * Proforma henüz tamamlanmadığı için
                  * nihai durum TAMAMLANDI değildir.
                  */
-                proforma.Status =
-                    "FINANS_ONAY_BEKLIYOR";
-
-                proforma.UpdatedAt =
-                    DateTime.Now;
-
-                proforma.UpdatedBy =
-                    userId;
+                proforma.Status = "FINANS_ONAY_BEKLIYOR";
+                proforma.UpdatedAt = DateTime.Now;
+                proforma.UpdatedBy = userId;
             }
-
             return result;
         }
-
         #endregion
 
         #region Workflow Completed
-
-        public async Task OnCompletedAsync(
-            ProcessRequest request,
-            int userId)
+        public async Task OnCompletedAsync(ProcessRequest request,int userId)
         {
-            if (request.EntityId == null)
-                return;
-
-            var proforma =
-                await _context.SalesProformas
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == request.EntityId.Value);
-
+            if (request.EntityId == null) return;
+            var proforma = await _context.SalesProformas.FirstOrDefaultAsync(x => x.Id == request.EntityId.Value);
             if (proforma == null)
             {
                 throw new Exception(
@@ -165,37 +118,23 @@ namespace GranitWebApi.Services.Proforma
             /*
              * Nihai proforma durumu.
              */
-            proforma.Status =
-                "TAMAMLANDI";
-
-            proforma.UpdatedAt =
-                DateTime.Now;
-
-            proforma.UpdatedBy =
-                userId;
-
+            proforma.Status = "TAMAMLANDI";
+            proforma.UpdatedAt = DateTime.Now;
+            proforma.UpdatedBy = userId;
             await Task.CompletedTask;
         }
-
         #endregion
 
         #region Returned
-
-        public async Task OnReturnedAsync(
-    ProcessRequest request,
-    int revisionStep,
-    int userId)
+        public async Task OnReturnedAsync(ProcessRequest request,int revisionStep,int userId)
         {
-            if (request.EntityId == null)
-                return;
+            if (request.EntityId == null) return;
 
             // İlk onay aşamasında revize
             if (revisionStep == 1)
             {
-                var proforma =
-                    await _context.SalesProformas
-                        .FirstOrDefaultAsync(x =>
-                            x.Id == request.EntityId.Value);
+                var proforma = await _context.SalesProformas
+                        .FirstOrDefaultAsync(x => x.Id == request.EntityId.Value);
 
                 if (proforma != null)
                 {
@@ -203,20 +142,15 @@ namespace GranitWebApi.Services.Proforma
                     proforma.UpdatedAt = DateTime.Now;
                     proforma.UpdatedBy = userId;
                 }
-
                 return;
             }
 
             // Finans ödeme aşamasında revize
-            if (revisionStep == 2 &&
-                IsPrepaymentWorkflow(request))
+            if (revisionStep == 2 && IsPrepaymentWorkflow(request))
             {
-                var payment =
-                    await _context.SalesProformaPayments
-                        .Where(x =>
-                            x.ProformaId == request.EntityId.Value)
-                        .OrderByDescending(x => x.Id)
-                        .FirstOrDefaultAsync();
+                var payment = await _context.SalesProformaPayments
+                        .Where(x => x.ProformaId == request.EntityId.Value)
+                        .OrderByDescending(x => x.Id).FirstOrDefaultAsync();
 
                 if (payment != null)
                 {
@@ -225,11 +159,7 @@ namespace GranitWebApi.Services.Proforma
                     payment.UpdatedBy = userId;
                 }
 
-                var proforma =
-                    await _context.SalesProformas
-                        .FirstOrDefaultAsync(x =>
-                            x.Id == request.EntityId.Value);
-
+                var proforma = await _context.SalesProformas.FirstOrDefaultAsync(x => x.Id == request.EntityId.Value);
                 if (proforma != null)
                 {
                     proforma.Status = "ON_ODEME_BEKLIYOR";
@@ -237,29 +167,19 @@ namespace GranitWebApi.Services.Proforma
                     proforma.UpdatedBy = userId;
                 }
             }
-
             await Task.CompletedTask;
         }
-
         #endregion
 
         #region Resubmitted
-
-        public async Task<WorkflowResubmitResult>
-            OnResubmittedAsync(
-                ProcessRequest request,
-                int revisionStep,
-                int userId)
+        public async Task<WorkflowResubmitResult>OnResubmittedAsync(ProcessRequest request,int revisionStep,int userId)
         {
-            var result =
-                new WorkflowResubmitResult
-                {
+            var result = new WorkflowResubmitResult {
                     PauseWorkflow = false,
                     CurrentStep = revisionStep
-                };
+            };
 
-            if (request.EntityId == null)
-                return result;
+            if (request.EntityId == null) return result;
 
             /*
              * İlk onay adımı revize edilmişse:
@@ -272,11 +192,7 @@ namespace GranitWebApi.Services.Proforma
              */
             if (revisionStep == 1)
             {
-                var proforma =
-                    await _context.SalesProformas
-                        .FirstOrDefaultAsync(x =>
-                            x.Id == request.EntityId.Value);
-
+                var proforma = await _context.SalesProformas.FirstOrDefaultAsync(x => x.Id == request.EntityId.Value);
                 if (proforma != null)
                 {
                     proforma.Status = "ONAY_BEKLIYOR";
@@ -300,37 +216,24 @@ namespace GranitWebApi.Services.Proforma
              *
              * çağırır.
              */
-            if (revisionStep == 2 &&
-                IsPrepaymentWorkflow(request))
+            if (revisionStep == 2 && IsPrepaymentWorkflow(request))
             {
-                var payment =
-                    await _context.SalesProformaPayments
-                        .Where(x =>
-                            x.ProformaId ==
-                                request.EntityId.Value &&
-                            x.Status == "REVIZE")
-                        .OrderByDescending(x => x.Id)
-                        .FirstOrDefaultAsync();
+                var payment = await _context.SalesProformaPayments
+                        .Where(x => x.ProformaId == request.EntityId.Value && x.Status == "REVIZE")
+                        .OrderByDescending(x => x.Id).FirstOrDefaultAsync();
 
                 if (payment != null)
                 {
-                    payment.Status =
-                        "ODEME_BILDIRILDI";
-
-                    payment.UpdatedAt =
-                        DateTime.Now;
-
-                    payment.UpdatedBy =
-                        userId;
+                    payment.Status = "ODEME_BILDIRILDI";
+                    payment.UpdatedAt = DateTime.Now;
+                    payment.UpdatedBy = userId;
                 }
 
                 result.PauseWorkflow = true;
                 result.CurrentStep = 0;
             }
-
             return result;
         }
-
         #endregion
 
         #region Payment Workflow
@@ -341,7 +244,6 @@ namespace GranitWebApi.Services.Proforma
                 return false;
 
             using var doc = JsonDocument.Parse(request.Parameters);
-
             var root = doc.RootElement;
 
             if (!root.TryGetProperty("PaymentType", out var paymentType))
@@ -361,18 +263,13 @@ namespace GranitWebApi.Services.Proforma
 
                 return paymentCondition.GetString() != "CASH_AGAINST_DOCUMENTS";
             }
-
             // VADELI ve LC bu akışa dahil değildir.
             return false;
         }
-
-
         #endregion
-        private bool IsCashAgainstDocumentsProforma(
-    ProcessRequest request)
+        private bool IsCashAgainstDocumentsProforma(ProcessRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Parameters))
-                return false;
+            if (string.IsNullOrWhiteSpace(request.Parameters)) return false;
 
             using var doc = JsonDocument.Parse(request.Parameters);
             var root = doc.RootElement;
@@ -384,18 +281,13 @@ namespace GranitWebApi.Services.Proforma
         }
         private bool IsDeferredPaymentWorkflow(ProcessRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Parameters))
-                return false;
+            if (string.IsNullOrWhiteSpace(request.Parameters)) return false;
 
             using var doc = JsonDocument.Parse(request.Parameters);
-
             var root = doc.RootElement;
 
-            return root.TryGetProperty("PaymentType", out var paymentType)
-                && string.Equals(
-                    paymentType.GetString(),
-                    "VADELI",
-                    StringComparison.OrdinalIgnoreCase);
+            return root.TryGetProperty("PaymentType", out var paymentType) && 
+                string.Equals(paymentType.GetString(),"VADELI",StringComparison.OrdinalIgnoreCase);
         }
     }
 }

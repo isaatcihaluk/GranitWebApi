@@ -93,12 +93,8 @@ namespace GranitWebApi.Services.Sales
             {
                 row = AddUMSection(ws,row,umPackages);
             }
-            var ykPackages = form.Packages
-    .Where(x =>
-        x.Lines != null &&
-        x.Lines.Any(l =>
-            l.ProductGroupId == "5"))
-    .ToList();
+            var ykPackages = form.Packages.Where(x =>
+                x.Lines != null && x.Lines.Any(l => l.ProductGroupId == "5")).ToList();
 
             if (ykPackages.Count > 0)
             {

@@ -91,14 +91,14 @@ namespace GranitWebApi.Workflow.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                try
-                {
-                    await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Workflow bildirim gönderilemedi: {ex.Message}");
-                }
+                //try
+                //{
+                //    await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine($"Workflow bildirim gönderilemedi: {ex.Message}");
+                //}
             }
             catch
             {
@@ -225,28 +225,28 @@ namespace GranitWebApi.Workflow.Services
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-                if (request.IsCompleted)
-                {
-                    try
-                    {
-                        await _workflowNotificationService.SendWorkflowCompletedAsync(request.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Workflow tamamlandı bildirimi gönderilemedi: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Workflow bildirim gönderilemedi: {ex.Message}");
-                    }
-                }
+                //if (request.IsCompleted)
+                //{
+                //    try
+                //    {
+                //        await _workflowNotificationService.SendWorkflowCompletedAsync(request.Id);
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        Console.WriteLine($"Workflow tamamlandı bildirimi gönderilemedi: {ex.Message}");
+                //    }
+                //}
+                //else
+                //{
+                //    try
+                //    {
+                //        await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        Console.WriteLine($"Workflow bildirim gönderilemedi: {ex.Message}");
+                //    }
+                //}
             }
             catch
             {
@@ -303,14 +303,14 @@ namespace GranitWebApi.Workflow.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                try
-                {
-                    await _workflowNotificationService.SendWorkflowRejectedAsync(request.Id,comment);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Workflow red bildirimi gönderilemedi: {ex.Message}");
-                }
+                //try
+                //{
+                //    await _workflowNotificationService.SendWorkflowRejectedAsync(request.Id,comment);
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine($"Workflow red bildirimi gönderilemedi: {ex.Message}");
+                //}
             }
             catch
             {
@@ -378,14 +378,14 @@ namespace GranitWebApi.Workflow.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                try
-                {
-                    await _workflowNotificationService.SendWorkflowReturnedAsync(request.Id,comment);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Workflow revize bildirimi gönderilemedi: {ex.Message}");
-                }
+                //try
+                //{
+                //    await _workflowNotificationService.SendWorkflowReturnedAsync(request.Id,comment);
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine($"Workflow revize bildirimi gönderilemedi: {ex.Message}");
+                //}
             }
             catch
             {
@@ -484,14 +484,14 @@ namespace GranitWebApi.Workflow.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                try
-                {
-                    await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Workflow tekrar gönderim bildirimi gönderilemedi: {ex.Message}");
-                }
+                //try
+                //{
+                //    await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine($"Workflow tekrar gönderim bildirimi gönderilemedi: {ex.Message}");
+                //}
             }
             catch
             {
@@ -598,14 +598,14 @@ namespace GranitWebApi.Workflow.Services
 
             await _context.SaveChangesAsync();
 
-            try
-            {
-                await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Workflow adım bildirimi gönderilemedi: {ex.Message}");
-            }
+            //try
+            //{
+            //    await _workflowNotificationService.SendWorkflowSubmittedAsync(request.Id);
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine($"Workflow adım bildirimi gönderilemedi: {ex.Message}");
+            //}
         }
 
         #endregion

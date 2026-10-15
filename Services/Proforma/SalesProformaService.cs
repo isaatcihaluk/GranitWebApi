@@ -228,11 +228,9 @@ namespace GranitWebApi.Services.Proforma
             await _context.SaveChangesAsync();
             return true;
         }
-
         #endregion
 
         #region Status
-
         public async Task<bool> UpdateStatusAsync(int id, string status, int userId)
         {
             var proforma = await _context.SalesProformas.FirstOrDefaultAsync(x => x.Id == id);
@@ -245,7 +243,6 @@ namespace GranitWebApi.Services.Proforma
 
             return true;
         }
-
         #endregion
 
         #region Payment
@@ -317,7 +314,6 @@ namespace GranitWebApi.Services.Proforma
         #endregion
 
         #region Submit Payment For Finance
-
         public async Task<bool> SubmitPaymentForFinanceAsync(int proformaId, int userId)
         {
             await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -367,7 +363,6 @@ namespace GranitWebApi.Services.Proforma
                 throw;
             }
         }
-
         #endregion
 
         #region Convert To Order
